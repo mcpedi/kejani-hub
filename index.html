@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NyumbaHub Kenya | Real Estate, House Rentals & Agent Portal</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Leaflet.js Interactive Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-brand-600 selection:text-white pb-24">
+
+  <!-- Navigation Bar -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <a href="#" onclick="switchPortal('marketplace')" class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+          <i class="fa-solid fa-house-chimney"></i>
+        </div>
+        <span class="font-extrabold text-xl tracking-tight text-slate-900">
+          Nyumba<span class="text-brand-600">Hub</span>
+          <span class="text-[10px] uppercase tracking-widest bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded ml-1 font-bold">KE</span>
+        </span>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
+        <button onclick="switchPortal('marketplace'); quickFilter('rent')" class="hover:text-brand-600 transition">To Rent</button>
+        <button onclick="switchPortal('marketplace'); quickFilter('sale')" class="hover:text-brand-600 transition">For Sale</button>
+        <button onclick="switchPortal('marketplace'); quickFilter('all')" class="hover:text-brand-600 transition">All Properties</button>
+        <button id="nav-dashboard-btn" onclick="switchPortal('dashboard')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-brand-50 text-slate-800 hover:text-brand-700 transition">
+          <i class="fa-solid fa-briefcase text-brand-600"></i> Landlord Dashboard
+        </button>
+      </nav>
+
+      <div class="flex items-center gap-2">
+        <!-- Mobile Dashboard Toggle -->
+        <button id="mobile-dashboard-btn" onclick="switchPortal(currentPortal === 'dashboard' ? 'marketplace' : 'dashboard')" class="md:hidden p-2.5 text-slate-700 hover:text-brand-600 hover:bg-slate-100 rounded-full transition" title="Landlord Dashboard">
+          <i class="fa-solid fa-briefcase text-base"></i>
+        </button>
+
+        <!-- Compare Trigger -->
+        <button id="header-compare-btn" onclick="openCompareModal()" class="relative p-2.5 text-slate-600 hover:text-brand-600 hover:bg-slate-100 rounded-full transition" title="Compare Properties">
+          <i class="fa-solid fa-scale-balanced text-base"></i>
+          <span id="compare-count" class="hidden absolute top-1 right-1 w-4 h-4 rounded-full bg-brand-600 text-white text-[10px] font-bold flex items-center justify-center">0</span>
+        </button>
+
+        <!-- Favorites Trigger -->
+        <button id="favorites-btn" onclick="toggleFavoritesView()" class="relative p-2.5 text-slate-600 hover:text-rose-500 hover:bg-slate-100 rounded-full transition" title="Saved Properties">
+          <i class="fa-regular fa-heart text-lg"></i>
+          <span id="fav-count" class="hidden absolute top-1 right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">0</span>
+        </button>
+
+        <!-- List Property CTA -->
+        <button onclick="openAddModal()" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-2">
+          <i class="fa-solid fa-plus"></i>
+          <span class="hidden sm:inline">List Property</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================= -->
+  <!-- LANDLORD & AGENT DASHBOARD VIEW                           -->
+  <!-- ========================================================= -->
+  <section id="dashboard-view" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div>
+        <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-700 bg-brand-100 px-2.5 py-1 rounded-md">
+          <i class="fa-solid fa-building-user"></i> Agent & Landlord Console
+        </span>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">Property & Tenancy Manager</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Update prices, toggle unit availability (Available vs. Occupied), or publish new listings.</p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2.5">
+        <button onclick="switchPortal('marketplace')" class="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold transition flex items-center gap-2">
+          <i class="fa-solid fa-arrow-left"></i> Back to Marketplace
+        </button>
+        <button onclick="openAddModal()" class="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold shadow-sm transition flex items-center gap-2">
+          <i class="fa-solid fa-plus"></i> Add New Unit
+        </button>
+      </div>
+    </div>
+
+    <!-- Dashboard KPI Cards -->
+    <div id="dashboard-stats" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"></div>
+
+    <!-- Dashboard Filter & Utility Bar -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 sm:px-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="setDashboardFilter('all')" data-dash-filter="all" class="dash-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white transition">All Units</button>
+          <button onclick="setDashboardFilter('available')" data-dash-filter="available" class="dash-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Available</button>
+          <button onclick="setDashboardFilter('occupied')" data-dash-filter="occupied" class="dash-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Occupied / Taken</button>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <input type="text" id="dash-search" placeholder="Search unit, estate, agent..." class="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          <button onclick="resetDemoProperties()" class="text-xs font-bold text-slate-500 hover:text-rose-600 px-3 py-2 rounded-lg hover:bg-rose-50 transition whitespace-nowrap" title="Restore initial sample listings">
+            <i class="fa-solid fa-rotate-left mr-1"></i> Reset Defaults
+          </button>
+        </div>
+      </div>
+
+      <!-- Managed Listings Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse min-w-[760px]">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+              <th class="py-3.5 px-5">Property</th>
+              <th class="py-3.5 px-4">Location</th>
+              <th class="py-3.5 px-4">Agent / Landlord</th>
+              <th class="py-3.5 px-4">Price (KES)</th>
+              <th class="py-3.5 px-4">Status</th>
+              <th class="py-3.5 px-5 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="dashboard-table-body" class="divide-y divide-slate-100 text-sm"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- PUBLIC MARKETPLACE VIEW                                   -->
+  <!-- ========================================================= -->
+  <div id="marketplace-view">
+    <!-- Hero Section & Search Bar -->
+    <section class="relative bg-slate-900 text-white py-14 lg:py-20 overflow-hidden">
+      <div class="absolute inset-0 opacity-30 bg-[url('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=80')] bg-cover bg-center"></div>
+      <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/75 to-slate-900/50"></div>
+
+      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/20 border border-brand-400/30 text-brand-300 text-xs font-semibold mb-4">
+          <i class="fa-solid fa-circle-check"></i> Verified Landlords & Agents Across Kenya
+        </span>
+        <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight max-w-3xl mx-auto leading-tight">
+          Find Your Next Home or Investment Property in Kenya
+        </h1>
+        <p class="mt-4 text-slate-300 max-w-2xl mx-auto text-sm sm:text-base">
+          Compare rentals side-by-side or explore properties on an interactive map across Nairobi, Mombasa, Kisumu, Nakuru, Eldoret, and Migori.
+        </p>
+
+        <!-- Filter Box -->
+        <div class="mt-9 bg-white text-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl max-w-5xl mx-auto text-left">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4 border-b border-slate-100 pb-3">
+            <div class="flex gap-2">
+              <button type="button" data-purpose="all" class="purpose-tab active px-4 py-1.5 rounded-lg text-sm font-bold bg-brand-600 text-white transition">All</button>
+              <button type="button" data-purpose="rent" class="purpose-tab px-4 py-1.5 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100 transition">For Rent</button>
+              <button type="button" data-purpose="sale" class="purpose-tab px-4 py-1.5 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100 transition">For Sale</button>
+            </div>
+
+            <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+              <input type="checkbox" id="filter-hide-occupied" checked class="rounded text-brand-600 focus:ring-brand-500" />
+              <span>Hide occupied units</span>
+            </label>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">County / Town</label>
+              <select id="filter-location" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="all">All Locations</option>
+                <option value="Nairobi">Nairobi</option>
+                <option value="Mombasa">Mombasa</option>
+                <option value="Kisumu">Kisumu</option>
+                <option value="Nakuru">Nakuru</option>
+                <option value="Eldoret">Eldoret</option>
+                <option value="Kiambu">Kiambu</option>
+                <option value="Migori">Migori</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Property Type</label>
+              <select id="filter-type" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="all">All Types</option>
+                <option value="Apartment">Apartment</option>
+                <option value="Bedsitter / Studio">Bedsitter / Studio</option>
+                <option value="Townhouse / Villa">Townhouse / Villa</option>
+                <option value="Bungalow">Bungalow</option>
+                <option value="Land / Plot">Land / Plot</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Max Budget (KES)</label>
+              <select id="filter-price" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="all">Any Budget</option>
+                <option value="15000">Up to KES 15,000</option>
+                <option value="40000">Up to KES 40,000</option>
+                <option value="85000">Up to KES 85,000</option>
+                <option value="150000">Up to KES 150,000</option>
+                <option value="10000000">Up to KES 10M (Sale)</option>
+                <option value="50000000">Up to KES 50M (Sale)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Estate / Keyword</label>
+              <div class="relative">
+                <input type="text" id="filter-keyword" placeholder="e.g. Kilimani, Borehole..." class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-3.5 pr-9 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-3 text-slate-400 text-sm"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Listings Section -->
+    <main id="listings-section" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <h2 id="listings-heading" class="text-2xl font-extrabold text-slate-900">Featured Properties</h2>
+          <p id="results-count" class="text-sm text-slate-500 mt-0.5">Showing all available properties</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="inline-flex rounded-xl bg-slate-200/80 p-1">
+            <button id="btn-grid-view" onclick="switchViewMode('grid')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-900 shadow-sm transition flex items-center gap-1.5">
+              <i class="fa-solid fa-grip"></i> Grid
+            </button>
+            <button id="btn-map-view" onclick="switchViewMode('map')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-map-location-dot"></i> Map View
+            </button>
+          </div>
+
+          <button id="reset-filters-btn" onclick="resetFilters()" class="hidden text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-3 py-2 rounded-lg transition">
+            <i class="fa-solid fa-rotate-left mr-1"></i> Reset
+          </button>
+
+          <select id="sort-select" class="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="featured">Sort: Featured</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Interactive Map Container -->
+      <div id="map-view-container" class="hidden mb-8">
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-md">
+          <div class="px-4 py-3 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span class="font-semibold"><i class="fa-solid fa-location-crosshairs text-brand-400 mr-1.5"></i> Click any price marker on the map to preview the property</span>
+            <span class="text-slate-400">Green = For Rent • Amber = For Sale</span>
+          </div>
+          <div id="kenya-map" class="w-full h-[520px] z-10"></div>
+        </div>
+      </div>
+
+      <!-- Property Grid -->
+      <div id="property-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7"></div>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="hidden text-center py-16 bg-white rounded-2xl border border-slate-200">
+        <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4 text-2xl">
+          <i class="fa-solid fa-house-circle-xmark"></i>
+        </div>
+        <h3 class="text-lg font-bold text-slate-900">No properties match your filters</h3>
+        <p class="text-sm text-slate-500 max-w-md mx-auto mt-1">Try increasing your budget range, switching locations, or clearing your search keywords.</p>
+        <button onclick="resetFilters()" class="mt-5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition">
+          Clear All Filters
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Floating Comparison Tray -->
+  <div id="compare-tray" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 hidden w-[95%] max-w-3xl bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 p-3.5 sm:px-5 flex flex-col sm:flex-row items-center justify-between gap-3 animate-modal">
+    <div class="flex items-center gap-3 overflow-x-auto w-full sm:w-auto">
+      <span class="text-xs font-extrabold uppercase tracking-wider text-brand-400 whitespace-nowrap">
+        <i class="fa-solid fa-scale-balanced mr-1"></i> Compare (<span id="tray-count">0</span>/3):
+      </span>
+      <div id="compare-tray-items" class="flex items-center gap-2"></div>
+    </div>
+    <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+      <button onclick="clearCompare()" class="text-xs text-slate-400 hover:text-white px-2.5 py-1.5 font-semibold">Clear</button>
+      <button onclick="openCompareModal()" class="bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow transition whitespace-nowrap">
+        Compare Now <i class="fa-solid fa-arrow-right ml-1"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-slate-900 text-slate-400 py-12 mt-16 border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div>
+        <div class="flex items-center gap-2 text-white font-extrabold text-lg">
+          <i class="fa-solid fa-house-chimney text-brand-500"></i>
+          <span>NyumbaHub Kenya</span>
+        </div>
+        <p class="mt-3 text-sm leading-relaxed">
+          Connecting tenants and homebuyers directly with verified landlords and real estate agencies across Kenya.
+        </p>
+      </div>
+      <div>
+        <h4 class="text-white font-bold text-sm uppercase tracking-wider mb-3">Popular Counties</h4>
+        <ul class="space-y-2 text-sm">
+          <li><button onclick="switchPortal('marketplace'); filterByCity('Nairobi')" class="hover:text-brand-400 transition">Nairobi Apartments & Houses</button></li>
+          <li><button onclick="switchPortal('marketplace'); filterByCity('Mombasa')" class="hover:text-brand-400 transition">Mombasa Coastal Homes</button></li>
+          <li><button onclick="switchPortal('marketplace'); filterByCity('Kisumu')" class="hover:text-brand-400 transition">Kisumu Lakeside Rentals</button></li>
+          <li><button onclick="switchPortal('marketplace'); filterByCity('Migori')" class="hover:text-brand-400 transition">Migori & South Nyanza Properties</button></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="text-white font-bold text-sm uppercase tracking-wider mb-3">Landlord & Agent Portal</h4>
+        <p class="text-sm">Manage rent rates, mark units occupied, or publish new properties from the <button onclick="switchPortal('dashboard')" class="text-brand-400 underline font-semibold">Landlord Dashboard</button>.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Side-by-Side Comparison Modal -->
+  <div id="compare-modal" class="fixed inset-0 z-50 hidden bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-5xl w-full overflow-hidden shadow-2xl my-8 animate-modal">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <i class="fa-solid fa-scale-balanced text-brand-400 text-lg"></i>
+          <h3 class="text-lg font-extrabold">Side-by-Side Property Comparison</h3>
+        </div>
+        <button onclick="closeCompareModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="compare-modal-content" class="p-6 overflow-x-auto"></div>
+    </div>
+  </div>
+
+  <!-- Property Details Modal -->
+  <div id="details-modal" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl my-8 animate-modal">
+      <div id="details-modal-content"></div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Property Modal -->
+  <div id="add-modal" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-2xl my-8 animate-modal">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <h3 id="property-modal-title" class="text-xl font-extrabold text-slate-900">List a Property in Kenya</h3>
+        <button onclick="closeAddModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="add-property-form" class="mt-5 space-y-4">
+        <input type="hidden" id="edit-property-id" value="" />
+
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Property Title *</label>
+          <input type="text" id="new-title" required placeholder="e.g. Modern 2 Bedroom Apartment with DSQ" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Purpose *</label>
+            <select id="new-purpose" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="rent">For Rent (Monthly)</option>
+              <option value="sale">For Sale</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Property Type *</label>
+            <select id="new-type" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="Apartment">Apartment</option>
+              <option value="Bedsitter / Studio">Bedsitter / Studio</option>
+              <option value="Townhouse / Villa">Townhouse / Villa</option>
+              <option value="Bungalow">Bungalow</option>
+              <option value="Land / Plot">Land / Plot</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Occupancy Status *</label>
+            <select id="new-status" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="available">Available</option>
+              <option value="occupied">Occupied / Taken</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">County / City *</label>
+            <select id="new-city" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="Nairobi">Nairobi</option>
+              <option value="Mombasa">Mombasa</option>
+              <option value="Kisumu">Kisumu</option>
+              <option value="Nakuru">Nakuru</option>
+              <option value="Eldoret">Eldoret</option>
+              <option value="Kiambu">Kiambu</option>
+              <option value="Migori">Migori</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Estate / Neighborhood *</label>
+            <input type="text" id="new-neighborhood" required placeholder="e.g. Kilimani, Nyali, Suna Central" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Price (KES) *</label>
+            <input type="number" id="new-price" required min="1000" placeholder="45000" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Bedrooms</label>
+            <input type="number" id="new-beds" min="0" value="2" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Bathrooms</label>
+            <input type="number" id="new-baths" min="0" value="2" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Agent / Landlord Name *</label>
+            <input type="text" id="new-agent" required placeholder="e.g. Kamau Properties" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">WhatsApp Number *</label>
+            <input type="tel" id="new-phone" required placeholder="254712345678" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Key Amenities (comma-separated)</label>
+          <input type="text" id="new-amenities" placeholder="Borehole, Backup Generator, 24/7 Security, Parking" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Description *</label>
+          <textarea id="new-description" rows="3" required placeholder="Describe water supply, security, proximity to tarmac/stages..." class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-3">
+          <button type="button" onclick="closeAddModal()" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+          <button type="submit" id="property-submit-btn" class="px-6 py-2.5 rounded-xl text-sm font-bold bg-brand-600 hover:bg-brand-700 text-white shadow-sm transition">Publish Listing</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-20 right-5 z-50 flex flex-col gap-2"></div>
+
+  <!-- Leaflet.js Interactive Map Script -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

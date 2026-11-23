@@ -1,0 +1,117 @@
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Property Card Hover Effects */
+.property-card {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+}
+
+.property-card:hover {
+  transform: translateY(-4px);
+}
+
+.property-card img {
+  transition: transform 0.5s ease;
+}
+
+.property-card:hover img {
+  transform: scale(1.05);
+}
+
+/* Custom Leaflet Price Tag Markers */
+.price-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.28);
+  border: 2px solid #ffffff;
+  transition: transform 0.15s ease;
+}
+
+.price-pin:hover {
+  transform: scale(1.1);
+  z-index: 999 !important;
+}
+
+.price-pin.rent {
+  background-color: #059669;
+  color: #ffffff;
+}
+
+.price-pin.sale {
+  background-color: #f59e0b;
+  color: #0f172a;
+}
+
+/* Leaflet Popup Customization */
+.leaflet-popup-content-wrapper {
+  border-radius: 14px !important;
+  padding: 0 !important;
+  overflow: hidden;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2) !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  width: 240px !important;
+  font-family: "Plus Jakarta Sans", sans-serif !important;
+}
+
+/* Modal Entrance Animation */
+@keyframes modalFadeScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal {
+  animation: modalFadeScale 0.22s ease-out forwards;
+}
+
+/* Toast Notification Animation */
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-item {
+  animation: toastSlideIn 0.25s ease-out forwards;
+}
