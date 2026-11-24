@@ -231,6 +231,7 @@
       return (data || []).map((row) => ({
         id: row.id, ownerId: row.user_id, title: row.title, purpose: row.purpose, type: row.type,
         status: row.status, city: row.city, neighborhood: row.neighborhood, lat: row.lat, lng: row.lng,
+        createdAt: row.created_at,
         price: Number(row.price), beds: row.beds, baths: row.baths, size: row.size, image: row.image, images: row.images || (row.image ? [row.image] : []),
         amenities: row.amenities || [], agent: row.agent, phone: row.phone, featured: row.featured,
         description: row.description
@@ -276,7 +277,7 @@
         : query.insert(row).select().single();
       const { data, error } = await query;
       if (error) throw error;
-      return { ...property, id: data.id, ownerId: data.user_id };
+      return { ...property, id: data.id, ownerId: data.user_id, createdAt: data.created_at };
     },
     async remove(id) {
       if (!client) return null;
@@ -286,6 +287,70 @@
     }
   };
   window.propertyRepo = propertyRepo;
+
+  const savedSearchRepo = {
+    configured,
+    async list() {
+      const user = requireProfileOwner(null, "view your saved searches");
+      const { data, error } = await client.from("property_alerts")
+        .select("id,name,criteria,enabled,created_at,updated_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      assertProfileOwnerStillCurrent(user);
+      return data || [];
+    },
+    async create(alert) {
+      const user = requireProfileOwner(null, "save a property search");
+      const source = alert.criteria && typeof alert.criteria === "object" ? alert.criteria : {};
+      const purpose = ["all", "rent", "sale"].includes(source.purpose) ? source.purpose : "all";
+      const sort = ["featured", "price-asc", "price-desc"].includes(source.sort) ? source.sort : "featured";
+      const city = String(source.city || "all").slice(0, 60);
+      const type = String(source.type || "all").slice(0, 60);
+      const priceValue = source.maxPrice == null ? "all" : String(source.maxPrice);
+      const cityOptions = new Set(Array.from(document.getElementById("filter-location").options, (option) => option.value));
+      const typeOptions = new Set(Array.from(document.getElementById("filter-type").options, (option) => option.value));
+      const priceOptions = new Set(Array.from(document.getElementById("filter-price").options, (option) => option.value));
+      const criteria = {
+        purpose,
+        city: cityOptions.has(city) ? city : "all",
+        type: typeOptions.has(type) ? type : "all",
+        maxPrice: priceOptions.has(priceValue) && priceValue !== "all" ? Number(priceValue) : null,
+        keyword: String(source.keyword || "").trim().slice(0, 120),
+        hideOccupied: source.hideOccupied !== false,
+        sort
+      };
+      const row = {
+        user_id: user.id,
+        name: String(alert.name || "Saved property search").trim().slice(0, 80),
+        criteria,
+        enabled: true
+      };
+      if (!row.name) throw new Error("Enter a name for this saved search.");
+      const { data, error } = await client.from("property_alerts").insert(row)
+        .select("id,name,criteria,enabled,created_at,updated_at").single();
+      if (error) throw error;
+      assertProfileOwnerStillCurrent(user);
+      return data;
+    },
+    async setEnabled(id, enabled) {
+      const user = requireProfileOwner(null, "update a saved search");
+      const { data, error } = await client.from("property_alerts")
+        .update({ enabled: !!enabled, updated_at: new Date().toISOString() })
+        .eq("id", id).eq("user_id", user.id)
+        .select("id").maybeSingle();
+      if (error) throw error;
+      assertProfileOwnerStillCurrent(user);
+      if (!data) throw new Error("Saved search not found or no longer accessible.");
+    },
+    async remove(id) {
+      const user = requireProfileOwner(null, "delete a saved search");
+      const { error } = await client.from("property_alerts").delete()
+        .eq("id", id).eq("user_id", user.id);
+      if (error) throw error;
+      assertProfileOwnerStillCurrent(user);
+    }
+  };
+  window.savedSearchRepo = savedSearchRepo;
   window.requireSupabaseAuth = requireAuth;
 
   if (client) {

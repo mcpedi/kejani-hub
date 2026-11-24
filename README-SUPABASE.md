@@ -16,7 +16,10 @@ The included `supabase-setup.sql` now matches the existing UUID/`user_id` schema
 - Add/edit forms support multiple property photos; uploaded images appear in listing cards and a selectable detail gallery.
 - Signed-in users can manage a private profile and avatar, update account email/password, save listing defaults, choose an accent color, compact property cards, and reduce motion.
 - Saved listing defaults prefill new listings only; they never rewrite existing listing contacts or settings.
+- Signed-in users can save, apply, pause, resume, and delete private property-search alerts. New matching listing counts are calculated in-app from Supabase `created_at` values; there is no email, SMS, or push delivery.
 - Existing sample properties remain demo content and are not stored in Supabase.
 - Without Supabase configuration, the site falls back to browser-local demo storage.
+
+The `property_alerts` table is an additive extension with owner-only row-level security. Its migration is in `migrations/20261124_property_alerts.sql`; the rerunnable `supabase-setup.sql` also includes it for compatible fresh setup. The alert feature uses the existing Supabase Auth session and browser-safe publishable key.
 
 For production, configure Supabase Auth's site URL and allowed redirect URLs for the website origin, and review the project's email-confirmation and password policies.

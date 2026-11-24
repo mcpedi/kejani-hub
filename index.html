@@ -265,6 +265,14 @@
             <i class="fa-solid fa-rotate-left mr-1"></i> Reset
           </button>
 
+          <button id="save-search-trigger" type="button" onclick="saveCurrentSearch()" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700 hover:bg-brand-100 transition">
+            <i class="fa-regular fa-bookmark"></i> Save search
+          </button>
+          <button id="saved-searches-trigger" type="button" onclick="openSavedSearches()" class="relative inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition">
+            <i class="fa-regular fa-bell"></i> Saved searches
+            <span id="saved-search-count" class="hidden absolute -right-1.5 -top-1.5 min-w-5 h-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-extrabold text-white" aria-label="New matches">0</span>
+          </button>
+
           <select id="sort-select" class="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="featured">Sort: Featured</option>
             <option value="price-asc">Price: Low to High</option>
@@ -627,6 +635,30 @@
     </div>
   </div>
 
+  <!-- Private saved searches and in-app new-listing matches -->
+  <div id="saved-searches-modal" class="fixed inset-0 z-[55] hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto" role="presentation" aria-hidden="true">
+    <section class="my-3 flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-modal" role="dialog" aria-modal="true" aria-labelledby="saved-searches-title">
+      <header class="flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-900 px-5 py-4 text-white sm:px-6">
+        <div>
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.16em] text-brand-300">Your property alerts</p>
+          <h2 id="saved-searches-title" class="mt-1 text-lg font-extrabold">Saved searches</h2>
+        </div>
+        <button id="saved-searches-close" type="button" aria-label="Close saved searches" class="grid h-9 w-9 place-items-center rounded-full bg-slate-800 text-white hover:bg-slate-700"><i class="fa-solid fa-xmark"></i></button>
+      </header>
+      <div class="overflow-y-auto p-4 sm:p-6">
+        <p class="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 px-3.5 py-3 text-xs leading-5 text-emerald-900">Saved searches are private to your signed-in account. Kejani Hub counts new matching listings here when the property list refreshes; email, SMS, and push delivery are not enabled.</p>
+        <form id="saved-search-form" class="mb-5 flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-end">
+          <label for="saved-search-name" class="min-w-0 flex-1 text-xs font-bold text-slate-700">Name this search
+            <input id="saved-search-name" type="text" maxlength="80" placeholder="e.g. Two-bedroom rentals in Nairobi" class="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </label>
+          <button type="submit" class="shrink-0 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"><i class="fa-solid fa-bookmark mr-1.5"></i>Save current filters</button>
+        </form>
+        <p id="saved-search-status" class="mb-3 min-h-5 text-xs text-slate-500" role="status" aria-live="polite"></p>
+        <div id="saved-searches-list" class="space-y-3" aria-live="polite"></div>
+      </div>
+    </section>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container" class="fixed bottom-20 right-5 z-50 flex flex-col gap-2"></div>
 
@@ -640,6 +672,7 @@
 
   <!-- Application Logic -->
   <script src="app.js"></script>
+  <script src="saved-searches.js"></script>
   <script src="profile.js"></script>
 </body>
 </html>
