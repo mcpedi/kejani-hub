@@ -5,4 +5,4 @@
 - [x] Keep saved-search criteria private to its owner with an additive `property_alerts` table and owner-scoped RLS; apply the compatible schema migration to the existing Kejani Hub project without dropping or replacing tables, rows, buckets, or policies unrelated to this feature.
 - [x] Show in-app counts of newly created matching property listings based on real `created_at` values. Clearly state this does not send email, SMS, or push notifications; do not claim simulated saves or demo records are persisted.
 - [x] Validate JavaScript syntax, SQL/RLS intent, and UI wiring; review the final diff.
-- [ ] Preserve the repository's existing branch and push the completed change to GitHub `main` per the active project workflow. Confirm the resulting commit and successful deployment only when evidence is available.
+- [x] Preserve the repository's existing branch and push the completed change to GitHub `main` per the active project workflow. Confirm the resulting commit and successful deployment only when evidence is available.
