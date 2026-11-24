@@ -150,6 +150,12 @@ input[type="checkbox"] {
   touch-action: manipulation;
 }
 
+#add-modal > div {
+  max-height: min(84dvh, 48rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 @media (max-width: 767px) {
   .site-header-inner {
     height: auto;
@@ -215,6 +221,10 @@ input[type="checkbox"] {
     overflow-y: auto;
     margin-top: 0;
     margin-bottom: 0;
+  }
+
+  #add-modal > div {
+    max-height: min(88dvh, 48rem);
   }
 
   #add-property-form input,
