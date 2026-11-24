@@ -1,0 +1,192 @@
+/* Supabase browser integration for NyumbaHub.
+ * Public reads are enabled by RLS; listing mutations require a signed-in owner.
+ */
+(function () {
+  const config = window.SUPABASE_CONFIG || {};
+  const configured = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(config.url || "") &&
+    !!config.anonKey && !String(config.anonKey).includes("YOUR_");
+  const client = configured && window.supabase
+    ? window.supabase.createClient(config.url, config.anonKey)
+    : null;
+
+  window.currentUser = null;
+  window.supabaseReady = !!client;
+
+  function announceAuthChange(user) {
+    window.currentUser = user || null;
+    window.dispatchEvent(new CustomEvent("supabase-auth-change", { detail: { user: window.currentUser } }));
+    updateAuthButton();
+  }
+
+  function toast(message, type = "info") {
+    if (typeof window.showToast === "function") window.showToast(message, type);
+    else console.info(message);
+  }
+
+  async function requireAuth() {
+    if (!client) {
+      toast("Add your Supabase Project URL and anon/publishable key in supabase-config.js first.", "info");
+      return false;
+    }
+    if (window.currentUser) return true;
+    document.getElementById("supabase-auth-modal")?.classList.remove("hidden");
+    return false;
+  }
+
+  function createAuthUI() {
+    if (document.getElementById("supabase-auth-modal")) return;
+    const button = document.createElement("button");
+    button.id = "supabase-auth-button";
+    button.className = "px-3 py-2 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-100 transition";
+    button.type = "button";
+    button.addEventListener("click", async () => {
+      if (window.currentUser) {
+        const { error } = await client.auth.signOut();
+        if (error) toast(error.message, "error");
+      } else document.getElementById("supabase-auth-modal").classList.remove("hidden");
+    });
+    document.querySelector("header .flex.items-center.gap-2")?.prepend(button);
+
+    const modal = document.createElement("div");
+    modal.id = "supabase-auth-modal";
+    modal.className = "fixed inset-0 z-[60] hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4";
+    modal.innerHTML = `
+      <section class="bg-white rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xl font-extrabold text-slate-900">Landlord / agent sign in</h2>
+          <button type="button" id="supabase-auth-close" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200">×</button>
+        </div>
+        <p class="text-sm text-slate-500 mb-5">Sign in to publish and manage your own property listings.</p>
+        <form id="supabase-auth-form" class="space-y-3">
+          <label class="block text-xs font-bold text-slate-600">Email
+            <input id="supabase-email" type="email" required autocomplete="email" class="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm" />
+          </label>
+          <label class="block text-xs font-bold text-slate-600">Password
+            <input id="supabase-password" type="password" required minlength="6" autocomplete="current-password" class="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm" />
+          </label>
+          <p id="supabase-auth-error" class="hidden text-sm text-rose-600" role="alert"></p>
+          <div class="flex gap-3 pt-2">
+            <button type="submit" class="flex-1 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold">Sign in</button>
+            <button type="button" id="supabase-signup" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-bold">Create account</button>
+          </div>
+        </form>
+      </section>`;
+    document.body.appendChild(modal);
+    document.getElementById("supabase-auth-close").addEventListener("click", () => modal.classList.add("hidden"));
+    modal.addEventListener("click", (event) => { if (event.target === modal) modal.classList.add("hidden"); });
+
+    const submitAuth = async (mode) => {
+      const email = document.getElementById("supabase-email").value.trim();
+      const password = document.getElementById("supabase-password").value;
+      const errorBox = document.getElementById("supabase-auth-error");
+      errorBox.classList.add("hidden");
+      const result = mode === "signup"
+        ? await client.auth.signUp({ email, password })
+        : await client.auth.signInWithPassword({ email, password });
+      if (result.error) {
+        errorBox.textContent = result.error.message;
+        errorBox.classList.remove("hidden");
+        return;
+      }
+      if (mode === "signup" && !result.data.session) {
+        errorBox.textContent = "Account created. Check your email to confirm it, then sign in.";
+        errorBox.classList.remove("hidden");
+        return;
+      }
+      modal.classList.add("hidden");
+      toast(mode === "signup" ? "Account created and signed in." : "Signed in successfully.", "success");
+    };
+    document.getElementById("supabase-auth-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitAuth("signin");
+    });
+    document.getElementById("supabase-signup").addEventListener("click", () => submitAuth("signup"));
+  }
+
+  function updateAuthButton() {
+    const button = document.getElementById("supabase-auth-button");
+    if (!button) return;
+    button.textContent = window.currentUser ? "Sign out" : "Landlord sign in";
+    button.title = window.currentUser?.email || "Sign in to manage listings";
+  }
+
+  const propertyRepo = {
+    configured,
+    async list() {
+      if (!client) return null;
+      const { data, error } = await client.from("properties").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data || []).map((row) => ({
+        id: row.id, ownerId: row.user_id, title: row.title, purpose: row.purpose, type: row.type,
+        status: row.status, city: row.city, neighborhood: row.neighborhood, lat: row.lat, lng: row.lng,
+        price: Number(row.price), beds: row.beds, baths: row.baths, size: row.size, image: row.image, images: row.images || (row.image ? [row.image] : []),
+        amenities: row.amenities || [], agent: row.agent, phone: row.phone, featured: row.featured,
+        description: row.description
+      }));
+    },
+    async uploadImages(files) {
+      if (!client) throw new Error("Supabase is not configured.");
+      if (!window.currentUser) throw new Error("Please sign in before uploading photos.");
+      const uploadedPaths = [];
+      const publicUrls = [];
+      try {
+        for (const file of files) {
+          const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80) || "photo";
+          const path = `${window.currentUser.id}/${crypto.randomUUID()}-${safeName}`;
+          const { data, error } = await client.storage.from("property-images").upload(path, file, {
+            cacheControl: "3600", upsert: false, contentType: file.type
+          });
+          if (error) throw error;
+          uploadedPaths.push(data.path);
+          publicUrls.push(client.storage.from("property-images").getPublicUrl(data.path).data.publicUrl);
+        }
+        return publicUrls;
+      } catch (error) {
+        if (uploadedPaths.length) await client.storage.from("property-images").remove(uploadedPaths);
+        throw error;
+      }
+    },
+    async save(property) {
+      if (!client) return null;
+      if (!window.currentUser) throw new Error("Please sign in to manage listings.");
+      const row = {
+        user_id: window.currentUser.id, title: property.title, purpose: property.purpose,
+        type: property.type, status: property.status || "available", city: property.city,
+        neighborhood: property.neighborhood, lat: property.lat, lng: property.lng,
+        price: property.price, beds: property.beds || 0, baths: property.baths || 0,
+        size: property.size || "Standard", image: property.image || "", images: property.images || (property.image ? [property.image] : []), amenities: property.amenities || [],
+        agent: property.agent, phone: property.phone, featured: !!property.featured,
+        description: property.description
+      };
+      let query = client.from("properties");
+      query = property.id && property.ownerId === window.currentUser.id
+        ? query.update(row).eq("id", property.id).select().single()
+        : query.insert(row).select().single();
+      const { data, error } = await query;
+      if (error) throw error;
+      return { ...property, id: data.id, ownerId: data.user_id };
+    },
+    async remove(id) {
+      if (!client) return null;
+      if (!window.currentUser) throw new Error("Please sign in to manage listings.");
+      const { error } = await client.from("properties").delete().eq("id", id);
+      if (error) throw error;
+    }
+  };
+  window.propertyRepo = propertyRepo;
+  window.requireSupabaseAuth = requireAuth;
+
+  if (client) {
+    createAuthUI();
+    client.auth.getSession().then(({ data }) => announceAuthChange(data.session?.user));
+    client.auth.onAuthStateChange((_event, session) => announceAuthChange(session?.user));
+  } else {
+    window.addEventListener("DOMContentLoaded", () => {
+      const badge = document.createElement("span");
+      badge.id = "supabase-setup-notice";
+      badge.className = "fixed bottom-4 left-4 z-40 rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900 shadow";
+      badge.textContent = "Supabase not configured — using this browser's local demo data";
+      document.body.appendChild(badge);
+    });
+  }
+})();

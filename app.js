@@ -187,11 +187,95 @@ const defaultProperties = [
 function loadSavedProperties() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_PROPERTIES);
-    if (!raw) return [...defaultProperties];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [...defaultProperties];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) && parsed.length ? parsed : [...defaultProperties];
   } catch {
     return [...defaultProperties];
+  }
+}
+
+async function refreshPropertiesFromSupabase() {
+  if (!window.propertyRepo?.configured) return;
+  try {
+    const remote = await window.propertyRepo.list();
+    if (remote) {
+      const demo = defaultProperties.map((item) => ({ ...item, id: -Number(item.id) }));
+      properties = [...demo, ...remote];
+      renderProperties();
+      if (currentPortal === "dashboard") renderDashboard();
+    }
+  } catch (error) {
+    console.error("Could not load Supabase property listings:", error);
+    showToast(`Could not load live listings: ${error.message}`, "error");
+  }
+}
+
+function clearImagePreviewUrls() {
+  imagePreviewObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+  imagePreviewObjectUrls = [];
+}
+
+function renderPropertyImagePreview() {
+  clearImagePreviewUrls();
+  if (!imagePreview) return;
+  imagePreview.replaceChildren();
+  const selectedFiles = Array.from(newImagesInput?.files || []);
+  const entries = [
+    ...currentPropertyImages.map((url) => ({ url, label: "Current photo" })),
+    ...selectedFiles.map((file) => {
+      const url = URL.createObjectURL(file);
+      imagePreviewObjectUrls.push(url);
+      return { url, label: file.name };
+    })
+  ];
+  entries.forEach(({ url, label }) => {
+    const card = document.createElement("div");
+    card.className = "overflow-hidden rounded-xl border border-slate-200 bg-white";
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = label;
+    img.className = "w-full rounded-t-xl object-cover";
+    img.loading = "lazy";
+    const caption = document.createElement("p");
+    caption.className = "truncate px-2 py-1.5 text-[11px] font-medium text-slate-500";
+    caption.textContent = label;
+    card.append(img, caption);
+    imagePreview.appendChild(card);
+  });
+  if (!entries.length) {
+    const hint = document.createElement("p");
+    hint.className = "col-span-full text-xs text-slate-500";
+    hint.textContent = "No photos selected yet. You can add photos now or edit the listing later.";
+    imagePreview.appendChild(hint);
+  }
+}
+
+function clearImageDraft() {
+  clearImagePreviewUrls();
+  currentPropertyImages = [];
+  if (newImagesInput) newImagesInput.value = "";
+  renderPropertyImagePreview();
+}
+
+async function collectListingImages() {
+  const files = Array.from(newImagesInput?.files || []);
+  if (!files.length) return [...currentPropertyImages];
+  if (!window.propertyRepo?.configured) throw new Error("Connect Supabase to upload and save property photos.");
+  const uploaded = await window.propertyRepo.uploadImages(files);
+  return [...uploaded, ...currentPropertyImages];
+}
+
+async function saveRemoteProperty(property) {
+  if (!window.propertyRepo?.configured) {
+    saveProperties();
+    return property;
+  }
+  if (!(await window.requireSupabaseAuth())) return null;
+  try {
+    return await window.propertyRepo.save(property);
+  } catch (error) {
+    showToast(`Could not save listing: ${error.message}`, "error");
+    return null;
   }
 }
 
@@ -201,7 +285,7 @@ function saveProperties() {
 
 // Application State
 let properties = loadSavedProperties();
-let favorites = JSON.parse(localStorage.getItem(STORAGE_KEY_FAVS) || "[]");
+let favorites = JSON.parse(localStorage.getItem(STORAGE_KEY_FAVS) || "[]").map(String);
 let compareList = [];
 let showFavoritesOnly = false;
 let currentPurpose = "all";
@@ -223,6 +307,13 @@ const listingsHeading = document.getElementById("listings-heading");
 const resetFiltersBtn = document.getElementById("reset-filters-btn");
 const favCountBadge = document.getElementById("fav-count");
 const compareCountBadge = document.getElementById("compare-count");
+const newImagesInput = document.getElementById("new-images");
+const imagePreview = document.getElementById("property-image-preview");
+let currentPropertyImages = [];
+let imagePreviewObjectUrls = [];
+const MAX_LISTING_IMAGES = 5;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 
 const filterLocation = document.getElementById("filter-location");
 const filterType = document.getElementById("filter-type");
@@ -250,6 +341,10 @@ function formatShortKES(amount) {
 // PORTAL SWITCHING (MARKETPLACE vs DASHBOARD)
 // ==========================================
 function switchPortal(portal) {
+  if (portal === "dashboard" && window.propertyRepo?.configured && !window.currentUser) {
+    window.requireSupabaseAuth();
+    return;
+  }
   currentPortal = portal;
   const navDashBtn = document.getElementById("nav-dashboard-btn");
 
@@ -279,10 +374,13 @@ function switchPortal(portal) {
 // LANDLORD & AGENT DASHBOARD LOGIC
 // ==========================================
 function renderDashboard() {
-  const totalCount = properties.length;
-  const availableCount = properties.filter((p) => (p.status || "available") === "available").length;
+  const dashboardProperties = window.propertyRepo?.configured
+    ? properties.filter((p) => p.ownerId && p.ownerId === window.currentUser?.id)
+    : properties;
+  const totalCount = dashboardProperties.length;
+  const availableCount = dashboardProperties.filter((p) => (p.status || "available") === "available").length;
   const occupiedCount = totalCount - availableCount;
-  const monthlyRentalPotential = properties
+  const monthlyRentalPotential = dashboardProperties
     .filter((p) => p.purpose === "rent")
     .reduce((sum, p) => sum + Number(p.price || 0), 0);
 
@@ -290,7 +388,7 @@ function renderDashboard() {
     <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
       <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Portfolio Units</p>
       <p class="text-2xl font-extrabold text-slate-900 mt-1.5">${totalCount}</p>
-      <p class="text-xs text-slate-500 mt-1">Across ${new Set(properties.map((p) => p.city)).size} Kenyan towns</p>
+      <p class="text-xs text-slate-500 mt-1">Across ${new Set(dashboardProperties.map((p) => p.city)).size} Kenyan towns</p>
     </div>
     <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
       <p class="text-xs font-bold uppercase tracking-wider text-emerald-600">Available Now</p>
@@ -310,7 +408,7 @@ function renderDashboard() {
   `;
 
   const searchTerm = (document.getElementById("dash-search")?.value || "").trim().toLowerCase();
-  const rows = properties.filter((prop) => {
+  const rows = dashboardProperties.filter((prop) => {
     const status = prop.status || "available";
     if (dashboardStatusFilter === "available" && status !== "available") return false;
     if (dashboardStatusFilter === "occupied" && status !== "occupied") return false;
@@ -340,7 +438,7 @@ function renderDashboard() {
         <tr class="hover:bg-slate-50/80 transition">
           <td class="py-3.5 px-5">
             <div class="flex items-center gap-3">
-              <img src="${prop.image}" alt="${prop.title}" class="w-12 h-12 rounded-xl object-cover bg-slate-100 shrink-0" />
+              <img src="${prop.image || prop.images?.[0] || ""}" alt="${prop.title}" class="w-12 h-12 rounded-xl object-cover bg-slate-100 shrink-0" />
               <div>
                 <p class="font-bold text-slate-900 line-clamp-1">${prop.title}</p>
                 <p class="text-xs text-slate-500">${prop.type} • ${prop.purpose === "rent" ? "Monthly Rent" : "For Sale"}</p>
@@ -359,7 +457,7 @@ function renderDashboard() {
             ${formatKES(prop.price)}<span class="text-xs font-normal text-slate-400">${prop.purpose === "rent" ? "/mo" : ""}</span>
           </td>
           <td class="py-3.5 px-4 whitespace-nowrap">
-            <button onclick="toggleOccupancyStatus(${prop.id})" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold transition ${
+            <button onclick="toggleOccupancyStatus('${prop.id}')" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold transition ${
               isOccupied
                 ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
                 : "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
@@ -370,10 +468,10 @@ function renderDashboard() {
           </td>
           <td class="py-3.5 px-5 text-right whitespace-nowrap">
             <div class="inline-flex items-center gap-1.5">
-              <button onclick="openEditModal(${prop.id})" class="p-2 rounded-lg text-slate-600 hover:text-brand-700 hover:bg-brand-50 transition" title="Edit Property">
+              <button onclick="openEditModal('${prop.id}')" class="p-2 rounded-lg text-slate-600 hover:text-brand-700 hover:bg-brand-50 transition" title="Edit Property">
                 <i class="fa-solid fa-pen-to-square"></i>
               </button>
-              <button onclick="deleteProperty(${prop.id})" class="p-2 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition" title="Delete Listing">
+              <button onclick="deleteProperty('${prop.id}')" class="p-2 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition" title="Delete Listing">
                 <i class="fa-solid fa-trash-can"></i>
               </button>
             </div>
@@ -396,26 +494,33 @@ function setDashboardFilter(filter) {
   renderDashboard();
 }
 
-function toggleOccupancyStatus(id) {
-  const prop = properties.find((p) => p.id === id);
+async function toggleOccupancyStatus(id) {
+  const prop = properties.find((p) => String(p.id) === String(id));
   if (!prop) return;
-  prop.status = (prop.status || "available") === "available" ? "occupied" : "available";
-  saveProperties();
-  renderDashboard();
-  renderProperties();
-  showToast(
-    `${prop.title} marked as ${prop.status === "occupied" ? "Occupied / Taken" : "Available"}`,
-    "success"
-  );
+  const updated = { ...prop, status: (prop.status || "available") === "available" ? "occupied" : "available" };
+  if (window.propertyRepo?.configured) {
+    if (!(await window.requireSupabaseAuth())) return;
+    try { await window.propertyRepo.save(updated); }
+    catch (error) { showToast(`Could not update listing: ${error.message}`, "error"); return; }
+  }
+  Object.assign(prop, updated);
+  if (!window.propertyRepo?.configured) saveProperties();
+  renderDashboard(); renderProperties();
+  showToast(`${prop.title} marked as ${prop.status === "occupied" ? "Occupied / Taken" : "Available"}`, "success");
 }
 
-function deleteProperty(id) {
-  const target = properties.find((p) => p.id === id);
+async function deleteProperty(id) {
+  const target = properties.find((p) => String(p.id) === String(id));
   if (!target) return;
-  properties = properties.filter((p) => p.id !== id);
-  favorites = favorites.filter((favId) => favId !== id);
+  if (window.propertyRepo?.configured) {
+    if (!(await window.requireSupabaseAuth())) return;
+    try { await window.propertyRepo.remove(target.id); }
+    catch (error) { showToast(`Could not delete listing: ${error.message}`, "error"); return; }
+  }
+  properties = properties.filter((p) => String(p.id) !== String(id));
+  favorites = favorites.filter((favId) => String(favId) !== String(id));
   compareList = compareList.filter((cmpId) => cmpId !== id);
-  saveProperties();
+  if (!window.propertyRepo?.configured) saveProperties();
   localStorage.setItem(STORAGE_KEY_FAVS, JSON.stringify(favorites));
   updateFavBadge();
   updateCompareUI();
@@ -425,6 +530,7 @@ function deleteProperty(id) {
 }
 
 function resetDemoProperties() {
+  if (window.propertyRepo?.configured) return;
   properties = [...defaultProperties];
   saveProperties();
   renderDashboard();
@@ -446,6 +552,7 @@ function updateFavBadge() {
 
 function toggleFavorite(event, id) {
   event.stopPropagation();
+  id = String(id);
   const index = favorites.indexOf(id);
   if (index === -1) {
     favorites.push(id);
@@ -475,6 +582,7 @@ function toggleFavoritesView() {
 
 function toggleCompare(event, id) {
   event.stopPropagation();
+  id = String(id);
   const idx = compareList.indexOf(id);
 
   if (idx !== -1) {
@@ -494,7 +602,7 @@ function toggleCompare(event, id) {
 }
 
 function removeFromCompare(id) {
-  compareList = compareList.filter((item) => item !== id);
+  compareList = compareList.filter((item) => String(item) !== String(id));
   updateCompareUI();
   renderProperties();
   if (!document.getElementById("compare-modal").classList.contains("hidden")) {
@@ -522,13 +630,13 @@ function updateCompareUI() {
 
     trayItems.innerHTML = compareList
       .map((id) => {
-        const prop = properties.find((p) => p.id === id);
+        const prop = properties.find((p) => String(p.id) === String(id));
         if (!prop) return "";
         return `
           <div class="flex items-center gap-2 bg-slate-800 border border-slate-700 pl-2 pr-1.5 py-1 rounded-lg text-xs">
-            <img src="${prop.image}" class="w-5 h-5 rounded object-cover" alt="" />
+            <img src="${prop.image || prop.images?.[0] || ""}" class="w-5 h-5 rounded object-cover" alt="" />
             <span class="max-w-[110px] truncate font-semibold">${prop.title}</span>
-            <button onclick="removeFromCompare(${prop.id})" class="text-slate-400 hover:text-rose-400 px-1">
+            <button onclick="removeFromCompare('${prop.id}')" class="text-slate-400 hover:text-rose-400 px-1">
               <i class="fa-solid fa-xmark"></i>
             </button>
           </div>
@@ -548,7 +656,7 @@ function openCompareModal() {
   }
 
   const selectedProps = compareList
-    .map((id) => properties.find((p) => p.id === id))
+    .map((id) => properties.find((p) => String(p.id) === String(id)))
     .filter(Boolean);
 
   const modal = document.getElementById("compare-modal");
@@ -574,8 +682,8 @@ function openCompareModal() {
               (p) => `
               <th class="p-3 border-b border-slate-200 align-top">
                 <div class="relative rounded-xl overflow-hidden h-32 mb-2.5 bg-slate-100">
-                  <img src="${p.image}" alt="${p.title}" class="w-full h-full object-cover" />
-                  <button onclick="removeFromCompare(${p.id})" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-900/75 text-white hover:bg-rose-600 text-xs flex items-center justify-center transition" title="Remove">
+                  <img src="${p.image || p.images?.[0] || ""}" alt="${p.title}" class="w-full h-full object-cover" />
+                  <button onclick="removeFromCompare('${p.id}')" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-900/75 text-white hover:bg-rose-600 text-xs flex items-center justify-center transition" title="Remove">
                     <i class="fa-solid fa-trash-can"></i>
                   </button>
                 </div>
@@ -733,14 +841,14 @@ function renderMapMarkers(filteredList) {
     const isOccupied = (prop.status || "available") === "occupied";
     const popupHtml = `
       <div>
-        <img src="${prop.image}" alt="${prop.title}" style="width:100%;height:115px;object-fit:cover;" />
+        <img src="${prop.image || prop.images?.[0] || ""}" alt="${prop.title}" style="width:100%;height:115px;object-fit:cover;" />
         <div style="padding:10px 12px;">
           <div style="font-size:10px;font-weight:800;color:#059669;text-transform:uppercase;">${prop.city} • ${prop.type}${isOccupied ? " • OCCUPIED" : ""}</div>
           <div style="font-size:13px;font-weight:800;color:#0f172a;margin-top:2px;line-height:1.25;">${prop.title}</div>
           <div style="font-size:13px;font-weight:800;color:#047857;margin-top:4px;">
             ${formatKES(prop.price)}${prop.purpose === "rent" ? "/mo" : ""}
           </div>
-          <button onclick="openDetailsModal(${prop.id})" style="margin-top:8px;width:100%;background:#0f172a;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;">
+          <button onclick="openDetailsModal('${prop.id}')" style="margin-top:8px;width:100%;background:#0f172a;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;">
             View Full Details
           </button>
         </div>
@@ -836,8 +944,8 @@ function renderProperties() {
 
   propertyGrid.innerHTML = filtered
     .map((prop) => {
-      const isFav = favorites.includes(prop.id);
-      const isCompared = compareList.includes(prop.id);
+      const isFav = favorites.includes(String(prop.id));
+      const isCompared = compareList.includes(String(prop.id));
       const isOccupied = (prop.status || "available") === "occupied";
       const badgeClass = prop.purpose === "rent" ? "bg-brand-600 text-white" : "bg-amber-500 text-slate-950";
       const badgeLabel = prop.purpose === "rent" ? "For Rent" : "For Sale";
@@ -853,10 +961,10 @@ function renderProperties() {
           `;
 
       return `
-        <article onclick="openDetailsModal(${prop.id})" class="property-card bg-white rounded-2xl border ${isCompared ? "border-brand-500 ring-2 ring-brand-500/30" : "border-slate-200/80"} overflow-hidden shadow-sm hover:shadow-xl cursor-pointer flex flex-col justify-between ${isOccupied ? "opacity-80" : ""}">
+        <article onclick="openDetailsModal('${prop.id}')" class="property-card bg-white rounded-2xl border ${isCompared ? "border-brand-500 ring-2 ring-brand-500/30" : "border-slate-200/80"} overflow-hidden shadow-sm hover:shadow-xl cursor-pointer flex flex-col justify-between ${isOccupied ? "opacity-80" : ""}">
           <div>
             <div class="relative h-56 overflow-hidden bg-slate-200">
-              <img src="${prop.image}" alt="${prop.title}" class="w-full h-full object-cover" loading="lazy" />
+              <img src="${prop.image || prop.images?.[0] || ""}" alt="${prop.title}" class="w-full h-full object-cover" loading="lazy" />
               <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
                 <span class="px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wide shadow-sm ${badgeClass}">
                   ${badgeLabel}
@@ -872,10 +980,10 @@ function renderProperties() {
               </div>
 
               <div class="absolute top-3 right-3 flex items-center gap-1.5">
-                <button onclick="toggleCompare(event, ${prop.id})" class="w-9 h-9 rounded-full ${isCompared ? "bg-brand-600 text-white" : "bg-white/90 hover:bg-white text-slate-700"} flex items-center justify-center shadow-sm transition" title="Compare property">
+                <button onclick="toggleCompare(event, '${prop.id}')" class="w-9 h-9 rounded-full ${isCompared ? "bg-brand-600 text-white" : "bg-white/90 hover:bg-white text-slate-700"} flex items-center justify-center shadow-sm transition" title="Compare property">
                   <i class="fa-solid fa-scale-balanced text-xs"></i>
                 </button>
-                <button onclick="toggleFavorite(event, ${prop.id})" class="w-9 h-9 rounded-full bg-white/90 hover:bg-white text-slate-700 flex items-center justify-center shadow-sm transition" title="Save property">
+                <button onclick="toggleFavorite(event, '${prop.id}')" class="w-9 h-9 rounded-full bg-white/90 hover:bg-white text-slate-700 flex items-center justify-center shadow-sm transition" title="Save property">
                   <i class="${isFav ? "fa-solid fa-heart text-rose-500" : "fa-regular fa-heart"}"></i>
                 </button>
               </div>
@@ -919,18 +1027,20 @@ function renderProperties() {
 }
 
 function openDetailsModal(id) {
-  const prop = properties.find((p) => p.id === id);
+  const prop = properties.find((p) => String(p.id) === String(id));
   if (!prop) return;
 
   const modal = document.getElementById("details-modal");
   const content = document.getElementById("details-modal-content");
   const priceSuffix = prop.purpose === "rent" ? " / month" : "";
-  const isCompared = compareList.includes(prop.id);
+  const isCompared = compareList.includes(String(prop.id));
   const isOccupied = (prop.status || "available") === "occupied";
+  const propertyPhotos = Array.isArray(prop.images) && prop.images.length ? prop.images : [prop.image].filter(Boolean);
+  const mainPhoto = propertyPhotos[0] || "";
 
   content.innerHTML = `
     <div class="relative h-64 sm:h-80 bg-slate-200">
-      <img src="${prop.image}" alt="${prop.title}" class="w-full h-full object-cover" />
+      <img id="details-main-photo" src="${mainPhoto}" alt="${prop.title}" class="w-full h-full object-cover" />
       <button onclick="closeDetailsModal()" class="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition">
         <i class="fa-solid fa-xmark text-lg"></i>
       </button>
@@ -939,8 +1049,9 @@ function openDetailsModal(id) {
         <span class="text-xs font-semibold text-slate-500">${priceSuffix}</span>
       </div>
     </div>
+    ${propertyPhotos.length > 1 ? `<div class="flex gap-2 overflow-x-auto border-b border-slate-100 p-3" aria-label="Property photos">${propertyPhotos.map((url, index) => `<button type="button" data-photo-url="${url}" aria-label="View property photo ${index + 1}" class="h-16 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${index === 0 ? "border-brand-600" : "border-transparent"}"><img src="${url}" alt="" class="h-full w-full object-cover" /></button>`).join("")}</div>` : ""}
 
-    <div class="p-6 sm:p-8">
+    <div class="p-5 sm:p-8">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <span class="text-xs font-bold uppercase tracking-wider text-brand-600">
           <i class="fa-solid fa-location-dot mr-1"></i> ${prop.neighborhood}, ${prop.city}
@@ -949,7 +1060,7 @@ function openDetailsModal(id) {
           <span class="text-xs font-bold px-3 py-1 rounded-full ${isOccupied ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}">
             ${isOccupied ? "Occupied / Taken" : "Available"}
           </span>
-          <button onclick="toggleCompare(event, ${prop.id}); openDetailsModal(${prop.id})" class="text-xs font-bold px-3 py-1 rounded-full ${isCompared ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"} transition">
+          <button onclick="toggleCompare(event, '${prop.id}'); openDetailsModal('${prop.id}')" class="text-xs font-bold px-3 py-1 rounded-full ${isCompared ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"} transition">
             <i class="fa-solid fa-scale-balanced mr-1"></i> ${isCompared ? "Added to Compare" : "Compare"}
           </button>
         </div>
@@ -991,6 +1102,13 @@ function openDetailsModal(id) {
     </div>
   `;
 
+  content.querySelectorAll("[data-photo-url]").forEach((button) => {
+    button.addEventListener("click", () => {
+      content.querySelector("#details-main-photo").src = button.dataset.photoUrl;
+      content.querySelectorAll("[data-photo-url]").forEach((item) => item.classList.toggle("border-brand-600", item === button));
+      content.querySelectorAll("[data-photo-url]").forEach((item) => item.classList.toggle("border-transparent", item !== button));
+    });
+  });
   modal.classList.remove("hidden");
 }
 
@@ -998,18 +1116,21 @@ function closeDetailsModal() {
   document.getElementById("details-modal").classList.add("hidden");
 }
 
-function openAddModal() {
+async function openAddModal() {
+  if (window.propertyRepo?.configured && !(await window.requireSupabaseAuth())) return;
   document.getElementById("edit-property-id").value = "";
   document.getElementById("property-modal-title").textContent = "List a Property in Kenya";
   document.getElementById("property-submit-btn").textContent = "Publish Listing";
   document.getElementById("add-property-form").reset();
+  currentPropertyImages = [];
+  renderPropertyImagePreview();
   document.getElementById("new-status").value = "available";
   document.getElementById("add-modal").classList.remove("hidden");
 }
 
-function openEditModal(id) {
-  const prop = properties.find((p) => p.id === id);
-  if (!prop) return;
+async function openEditModal(id) {
+  const prop = properties.find((p) => String(p.id) === String(id));
+  if (!prop || (window.propertyRepo?.configured && prop.ownerId !== window.currentUser?.id)) return;
 
   document.getElementById("edit-property-id").value = String(prop.id);
   document.getElementById("property-modal-title").textContent = "Edit Property Listing";
@@ -1028,6 +1149,11 @@ function openEditModal(id) {
   document.getElementById("new-phone").value = prop.phone;
   document.getElementById("new-amenities").value = (prop.amenities || []).join(", ");
   document.getElementById("new-description").value = prop.description;
+  newImagesInput.value = "";
+  currentPropertyImages = Array.isArray(prop.images) && prop.images.length
+    ? [...prop.images]
+    : (prop.image ? [prop.image] : []);
+  renderPropertyImagePreview();
 
   document.getElementById("add-modal").classList.remove("hidden");
 }
@@ -1035,11 +1161,27 @@ function openEditModal(id) {
 function closeAddModal() {
   document.getElementById("add-modal").classList.add("hidden");
   document.getElementById("edit-property-id").value = "";
+  clearImageDraft();
 }
 
+newImagesInput?.addEventListener("change", () => {
+  const files = Array.from(newImagesInput.files || []);
+  const total = currentPropertyImages.length + files.length;
+  const invalidFile = files.find((file) => !ALLOWED_IMAGE_TYPES.has(file.type) || file.size > MAX_IMAGE_BYTES);
+  if (total > MAX_LISTING_IMAGES) {
+    showToast(`A listing can have up to ${MAX_LISTING_IMAGES} photos total.`, "error");
+    newImagesInput.value = "";
+  } else if (invalidFile) {
+    showToast("Use JPG, PNG, WEBP, or AVIF photos under 5 MB each.", "error");
+    newImagesInput.value = "";
+  }
+  renderPropertyImagePreview();
+});
+
 // Handle Add / Edit Property Form Submission
-document.getElementById("add-property-form").addEventListener("submit", (e) => {
+document.getElementById("add-property-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (window.propertyRepo?.configured && !(await window.requireSupabaseAuth())) return;
 
   const editId = document.getElementById("edit-property-id").value;
   const selectedCity = document.getElementById("new-city").value;
@@ -1051,6 +1193,13 @@ document.getElementById("add-property-form").addEventListener("submit", (e) => {
     : ["24/7 Security", "Water Available"];
 
   const cleanPhone = document.getElementById("new-phone").value.replace(/\D/g, "");
+  let listingImages;
+  try {
+    listingImages = await collectListingImages();
+  } catch (error) {
+    showToast(`Photo upload failed: ${error.message}`, "error");
+    return;
+  }
 
   if (editId) {
     const existing = properties.find((p) => String(p.id) === editId);
@@ -1073,8 +1222,14 @@ document.getElementById("add-property-form").addEventListener("submit", (e) => {
       existing.phone = cleanPhone;
       existing.amenities = amenitiesList;
       existing.description = document.getElementById("new-description").value.trim();
+      existing.images = listingImages;
+      if (listingImages.length) existing.image = listingImages[0];
 
-      saveProperties();
+      if (window.propertyRepo?.configured) {
+        const saved = await saveRemoteProperty(existing);
+        if (!saved) return;
+        Object.assign(existing, saved);
+      } else saveProperties();
       closeAddModal();
       renderDashboard();
       renderProperties();
@@ -1084,7 +1239,7 @@ document.getElementById("add-property-form").addEventListener("submit", (e) => {
   }
 
   const newProperty = {
-    id: Date.now(),
+    id: null,
     title: document.getElementById("new-title").value.trim(),
     purpose: document.getElementById("new-purpose").value,
     type: document.getElementById("new-type").value,
@@ -1097,7 +1252,8 @@ document.getElementById("add-property-form").addEventListener("submit", (e) => {
     beds: Number(document.getElementById("new-beds").value),
     baths: Number(document.getElementById("new-baths").value),
     size: "Standard",
-    image: "https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=900&q=80",
+    image: listingImages[0] || "https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=900&q=80",
+    images: listingImages,
     amenities: amenitiesList,
     agent: document.getElementById("new-agent").value.trim(),
     phone: cleanPhone,
@@ -1105,13 +1261,20 @@ document.getElementById("add-property-form").addEventListener("submit", (e) => {
     description: document.getElementById("new-description").value.trim()
   };
 
-  properties.unshift(newProperty);
-  saveProperties();
+  if (window.propertyRepo?.configured) {
+    const saved = await saveRemoteProperty(newProperty);
+    if (!saved) return;
+    properties.unshift(saved);
+  } else {
+    newProperty.id = Date.now();
+    properties.unshift(newProperty);
+    saveProperties();
+  }
   e.target.reset();
   closeAddModal();
   renderDashboard();
   renderProperties();
-  showToast("Property published & saved!", "success");
+  showToast(window.propertyRepo?.configured ? "Property published to Supabase!" : "Property published & saved!", "success");
 });
 
 function quickFilter(purpose) {
@@ -1155,6 +1318,7 @@ function resetFilters() {
 }
 
 function showToast(message, type = "success") {
+  window.showToast = showToast;
   const container = document.getElementById("toast-container");
   const toast = document.createElement("div");
   const bgColor = type === "success" ? "bg-slate-900 border-brand-500" : "bg-slate-800 border-slate-600";
@@ -1191,3 +1355,12 @@ window.addEventListener("click", (e) => {
 updateFavBadge();
 updateCompareUI();
 renderProperties();
+refreshPropertiesFromSupabase();
+window.addEventListener("supabase-auth-change", () => {
+  refreshPropertiesFromSupabase();
+  if (currentPortal === "dashboard") renderDashboard();
+});
+if (window.propertyRepo?.configured) {
+  const resetButton = document.querySelector('[onclick="resetDemoProperties()"]');
+  if (resetButton) resetButton.classList.add("hidden");
+}

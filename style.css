@@ -115,3 +115,139 @@ html {
 .toast-item {
   animation: toastSlideIn 0.25s ease-out forwards;
 }
+
+
+/* Responsive refinements for compact phones, tablets, and wider displays */
+.site-header-inner {
+  gap: 0.5rem;
+}
+
+.site-header-inner > a {
+  flex-shrink: 0;
+}
+
+.site-header-actions {
+  min-width: 0;
+}
+
+.photo-upload-zone:focus-within {
+  outline: 3px solid rgba(5, 150, 105, 0.24);
+  outline-offset: 2px;
+}
+
+#property-image-preview img {
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+#details-modal-content img {
+  max-width: 100%;
+}
+
+button,
+select,
+input[type="checkbox"] {
+  touch-action: manipulation;
+}
+
+@media (max-width: 767px) {
+  .site-header-inner {
+    height: auto;
+    min-height: 4rem;
+    flex-wrap: wrap;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    row-gap: 0.25rem;
+  }
+
+  .site-header-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .site-header-actions > button {
+    min-height: 2.75rem;
+  }
+
+  #supabase-auth-button {
+    max-width: 7.25rem;
+    padding-left: 0.55rem;
+    padding-right: 0.55rem;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+
+  #listings-section {
+    padding-top: 1.75rem;
+    padding-bottom: 2rem;
+  }
+
+  #listings-section > div:first-child {
+    align-items: stretch;
+  }
+
+  #listings-section > div:first-child > div:last-child {
+    gap: 0.5rem;
+  }
+
+  #sort-select {
+    flex: 1 1 9rem;
+    min-height: 2.75rem;
+  }
+
+  #map-view-container #kenya-map {
+    height: min(62vh, 440px);
+  }
+
+  #add-modal,
+  #details-modal,
+  #compare-modal {
+    align-items: flex-start;
+    padding: 0.5rem;
+  }
+
+  #add-modal > div,
+  #details-modal > div,
+  #compare-modal > div {
+    max-height: calc(100dvh - 1rem);
+    overflow-y: auto;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  #add-property-form input,
+  #add-property-form select,
+  #add-property-form textarea {
+    font-size: 16px;
+  }
+
+  #compare-tray {
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
+    width: calc(100% - 1rem);
+    max-height: 40vh;
+    overflow: auto;
+  }
+
+  .toast-item {
+    max-width: min(90vw, 24rem);
+  }
+}
+
+@media (min-width: 768px) {
+  .site-header-actions {
+    flex-shrink: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
