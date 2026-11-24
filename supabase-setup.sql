@@ -68,3 +68,54 @@ create policy "Public can view property listing photos" on storage.objects for s
 create policy "Owners can upload property listing photos" on storage.objects for insert to authenticated with check (bucket_id = 'property-images' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "Owners can update property listing photos" on storage.objects for update to authenticated using (bucket_id = 'property-images' and (storage.foldername(name))[1] = auth.uid()::text) with check (bucket_id = 'property-images' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "Owners can delete property listing photos" on storage.objects for delete to authenticated using (bucket_id = 'property-images' and (storage.foldername(name))[1] = auth.uid()::text);
+
+
+-- Private user profiles and private avatars (owner-only access).
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  full_name text not null default '',
+  phone text not null default '',
+  agency text not null default '',
+  location text not null default '',
+  bio text not null default '',
+  website text not null default '',
+  avatar_path text,
+  default_city text not null default 'Nairobi',
+  default_purpose text not null default 'rent' check (default_purpose in ('rent', 'sale')),
+  preferences jsonb not null default '{"accent":"emerald","compactCards":false,"reduceMotion":false,"autoFillListingContact":true}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.profiles enable row level security;
+drop policy if exists "Users can read own profile" on public.profiles;
+drop policy if exists "Users can create own profile" on public.profiles;
+drop policy if exists "Users can update own profile" on public.profiles;
+create policy "Users can read own profile"
+  on public.profiles for select to authenticated using (auth.uid() = id);
+create policy "Users can create own profile"
+  on public.profiles for insert to authenticated with check (auth.uid() = id);
+create policy "Users can update own profile"
+  on public.profiles for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);
+grant select, insert, update on public.profiles to authenticated;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('user-avatars', 'user-avatars', false, 2097152, array['image/jpeg','image/png','image/webp','image/avif']::text[])
+on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+drop policy if exists "Users can view own profile avatars" on storage.objects;
+drop policy if exists "Users can upload own profile avatars" on storage.objects;
+drop policy if exists "Users can update own profile avatars" on storage.objects;
+drop policy if exists "Users can delete own profile avatars" on storage.objects;
+create policy "Users can view own profile avatars"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'user-avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "Users can upload own profile avatars"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'user-avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "Users can update own profile avatars"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'user-avatars' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'user-avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "Users can delete own profile avatars"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'user-avatars' and (storage.foldername(name))[1] = auth.uid()::text);

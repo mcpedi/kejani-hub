@@ -251,3 +251,192 @@ input[type="checkbox"] {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* Signed-in profile center */
+body.profile-modal-open {
+  overflow: hidden;
+}
+
+.profile-modal-panel {
+  width: min(100%, 56rem);
+}
+
+.profile-modal-body {
+  overscroll-behavior: contain;
+}
+
+.profile-tab {
+  flex: 0 0 auto;
+  min-height: 2.65rem;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 800;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.profile-tab:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.profile-tab.is-active {
+  background: var(--profile-accent-50, #ecfdf5);
+  color: var(--profile-accent-700, #047857);
+}
+
+.profile-field {
+  display: block;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.profile-field input,
+.profile-field select,
+.profile-field textarea,
+.profile-control {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.65rem 0.85rem;
+  color: #0f172a;
+  font-size: 0.875rem;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.profile-field textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.profile-field input:focus,
+.profile-field select:focus,
+.profile-field textarea:focus,
+.profile-control:focus {
+  outline: 2px solid rgba(5, 150, 105, 0.22);
+  border-color: #059669;
+}
+
+.profile-help {
+  display: block;
+  margin-top: 0.35rem;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
+.profile-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  padding: 0.85rem;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.profile-check input {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.1rem;
+  accent-color: var(--profile-accent-600, #059669);
+  flex: 0 0 auto;
+}
+
+.profile-check strong,
+.profile-check small {
+  display: block;
+}
+
+.profile-check strong {
+  font-size: 0.76rem;
+  line-height: 1.2rem;
+}
+
+.profile-check small {
+  margin-top: 0.2rem;
+  color: #64748b;
+  font-size: 0.68rem;
+  line-height: 1rem;
+  font-weight: 500;
+}
+
+.profile-avatar-preview {
+  display: grid;
+  width: 5.25rem;
+  height: 5.25rem;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid #e2e8f0;
+  border-radius: 9999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 1.7rem;
+}
+
+.profile-avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-avatar-preview span {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+}
+
+.profile-status {
+  min-height: 1.15rem;
+  margin-top: 0.45rem;
+  color: #047857;
+  font-size: 0.75rem;
+}
+
+.profile-status.is-error {
+  color: #be123c;
+}
+
+.profile-reduced-motion *,
+.profile-reduced-motion *::before,
+.profile-reduced-motion *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+.profile-compact #property-grid {
+  gap: 1rem;
+}
+.profile-compact .property-card > div:first-child > div:first-child {
+  height: 10rem !important;
+}
+
+@media (min-width: 1280px) {
+  .profile-compact #property-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .profile-modal-panel {
+    max-height: 100dvh;
+  }
+
+  .profile-tab {
+    padding-inline: 0.72rem;
+  }
+}

@@ -345,6 +345,146 @@
     </div>
   </footer>
 
+  <!-- Signed-in user profile and account center -->
+  <div id="profile-modal" class="fixed inset-0 z-[70] hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4" aria-hidden="true">
+    <section class="profile-modal-panel bg-white w-full max-w-4xl h-full sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+      <header class="flex items-start justify-between gap-4 border-b border-slate-100 px-4 py-4 sm:px-6">
+        <div>
+          <p class="text-[11px] font-extrabold uppercase tracking-widest text-brand-600">Your account</p>
+          <h2 id="profile-modal-title" class="mt-1 text-xl sm:text-2xl font-extrabold text-slate-900">My profile</h2>
+          <p class="mt-1 text-xs sm:text-sm text-slate-500">Personalize your account, listing defaults, and appearance.</p>
+        </div>
+        <button id="profile-close" type="button" class="shrink-0 w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600" aria-label="Close profile">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </header>
+
+      <nav class="profile-tabs flex gap-2 overflow-x-auto border-b border-slate-100 px-4 py-3 sm:px-6" role="tablist" aria-label="Profile sections">
+        <button type="button" class="profile-tab is-active" role="tab" aria-selected="true" aria-controls="profile-panel-details" data-profile-tab="details"><i class="fa-regular fa-user mr-1.5"></i>Profile</button>
+        <button type="button" class="profile-tab" role="tab" aria-selected="false" aria-controls="profile-panel-preferences" data-profile-tab="preferences"><i class="fa-solid fa-sliders mr-1.5"></i>Preferences</button>
+        <button type="button" class="profile-tab" role="tab" aria-selected="false" aria-controls="profile-panel-account" data-profile-tab="account"><i class="fa-solid fa-shield-halved mr-1.5"></i>Account & security</button>
+      </nav>
+
+      <div class="profile-modal-body flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
+        <section id="profile-panel-details" class="profile-panel" role="tabpanel" aria-labelledby="profile-modal-title" data-profile-panel="details">
+          <form id="profile-details-form" class="space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div class="profile-avatar-preview shrink-0" aria-label="Profile photo preview">
+                <img id="profile-avatar-img" class="hidden" alt="Your profile photo" />
+                <span id="profile-avatar-fallback"><i class="fa-regular fa-user"></i></span>
+              </div>
+              <div class="min-w-0">
+                <h3 class="font-bold text-slate-900">Profile photo</h3>
+                <p class="mt-1 text-xs text-slate-500">Private to your account. JPG, PNG, WEBP or AVIF, up to 2 MB.</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <label for="profile-avatar-input" class="cursor-pointer rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 border border-slate-200 hover:bg-slate-100">Choose photo</label>
+                  <input id="profile-avatar-input" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/avif" />
+                  <button id="profile-avatar-remove" type="button" class="hidden rounded-lg px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50">Remove photo</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label class="profile-field">Full name *
+                <input id="profile-full-name" type="text" maxlength="80" autocomplete="name" required placeholder="Your name" />
+              </label>
+              <label class="profile-field">Phone / WhatsApp
+                <input id="profile-phone" type="tel" maxlength="32" autocomplete="tel" placeholder="254712345678" />
+              </label>
+              <label class="profile-field">Agency or business
+                <input id="profile-agency" type="text" maxlength="100" autocomplete="organization" placeholder="Agency name (optional)" />
+              </label>
+              <label class="profile-field">Town / location
+                <input id="profile-location" type="text" maxlength="100" placeholder="e.g. Nairobi, Kenya" />
+              </label>
+              <label class="profile-field sm:col-span-2">Website
+                <input id="profile-website" type="url" maxlength="200" placeholder="https://example.com" />
+              </label>
+              <label class="profile-field sm:col-span-2">Short bio
+                <textarea id="profile-bio" rows="3" maxlength="500" placeholder="A short introduction for your own reference."></textarea>
+                <span class="profile-help">Up to 500 characters. Your profile information is private and won’t be published automatically.</span>
+              </label>
+            </div>
+            <p id="profile-details-status" class="profile-status" role="status" aria-live="polite"></p>
+            <div class="flex justify-end">
+              <button type="submit" id="profile-details-save" class="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700"><i class="fa-solid fa-floppy-disk mr-1.5"></i>Save profile</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="profile-panel-preferences" class="profile-panel hidden" role="tabpanel" aria-labelledby="profile-modal-title" data-profile-panel="preferences">
+          <form id="profile-preferences-form" class="space-y-6">
+            <div>
+              <h3 class="text-sm font-extrabold text-slate-900">New listing defaults</h3>
+              <p class="mt-1 text-xs text-slate-500">Defaults are applied only when starting a new listing. Existing listings are never changed.</p>
+              <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label class="profile-field">Default town / county
+                  <select id="profile-default-city">
+                    <option value="Nairobi">Nairobi</option><option value="Mombasa">Mombasa</option><option value="Kisumu">Kisumu</option><option value="Nakuru">Nakuru</option><option value="Eldoret">Eldoret</option><option value="Kiambu">Kiambu</option><option value="Migori">Migori</option>
+                  </select>
+                </label>
+                <label class="profile-field">Default listing purpose
+                  <select id="profile-default-purpose"><option value="rent">For rent</option><option value="sale">For sale</option></select>
+                </label>
+              </div>
+              <label class="profile-check mt-4"><input id="profile-autofill-contact" type="checkbox" checked /><span><strong>Pre-fill my name and phone on new listings</strong><small>You can still edit these details before publishing.</small></span></label>
+            </div>
+
+            <div class="border-t border-slate-100 pt-5">
+              <h3 class="text-sm font-extrabold text-slate-900">Appearance</h3>
+              <p class="mt-1 text-xs text-slate-500">These choices are saved to your account and apply on this device after sign-in.</p>
+              <label class="profile-field mt-4">Brand accent
+                <select id="profile-accent">
+                  <option value="emerald">Emerald</option><option value="blue">Blue</option><option value="violet">Violet</option><option value="rose">Rose</option><option value="amber">Amber</option>
+                </select>
+              </label>
+              <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="profile-check"><input id="profile-compact-cards" type="checkbox" /><span><strong>Compact property cards</strong><small>Fit more listings on the screen.</small></span></label>
+                <label class="profile-check"><input id="profile-reduce-motion" type="checkbox" /><span><strong>Reduce motion</strong><small>Minimize animations and smooth scrolling.</small></span></label>
+              </div>
+            </div>
+            <p id="profile-preferences-status" class="profile-status" role="status" aria-live="polite"></p>
+            <div class="flex justify-end">
+              <button type="submit" id="profile-preferences-save" class="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700"><i class="fa-solid fa-sliders mr-1.5"></i>Save preferences</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="profile-panel-account" class="profile-panel hidden" role="tabpanel" aria-labelledby="profile-modal-title" data-profile-panel="account">
+          <div class="space-y-5">
+            <div class="rounded-2xl border border-slate-200 p-4">
+              <h3 class="font-bold text-slate-900">Email address</h3>
+              <p id="profile-current-email" class="mt-1 text-sm text-slate-600"></p>
+              <form id="profile-email-form" class="mt-4 flex flex-col sm:flex-row gap-2">
+                <input id="profile-new-email" type="email" autocomplete="email" required placeholder="New email address" class="profile-control flex-1" />
+                <button type="submit" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold hover:bg-slate-50">Update email</button>
+              </form>
+              <p id="profile-email-status" class="profile-status" role="status" aria-live="polite"></p>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 p-4">
+              <h3 class="font-bold text-slate-900">Change password</h3>
+              <form id="profile-password-form" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input id="profile-new-password" type="password" minlength="8" autocomplete="new-password" required placeholder="New password (8+ characters)" class="profile-control" />
+                <input id="profile-confirm-password" type="password" minlength="8" autocomplete="new-password" required placeholder="Confirm new password" class="profile-control" />
+                <button type="submit" class="sm:col-span-2 justify-self-start rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold hover:bg-slate-50">Update password</button>
+              </form>
+              <p id="profile-password-status" class="profile-status" role="status" aria-live="polite"></p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-slate-50 p-4">
+              <div><h3 class="font-bold text-slate-900">Your listings</h3><p class="mt-1 text-xs text-slate-500">Open the landlord dashboard to manage your properties.</p></div>
+              <button id="profile-manage-listings" type="button" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold hover:bg-slate-100">Manage listings</button>
+            </div>
+            <div class="flex justify-end border-t border-slate-100 pt-4">
+              <button id="profile-sign-out" type="button" class="rounded-xl px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-50"><i class="fa-solid fa-arrow-right-from-bracket mr-1.5"></i>Sign out</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
   <!-- Side-by-Side Comparison Modal -->
   <div id="compare-modal" class="fixed inset-0 z-50 hidden bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-white rounded-2xl max-w-5xl w-full overflow-hidden shadow-2xl my-8 animate-modal">
@@ -500,5 +640,6 @@
 
   <!-- Application Logic -->
   <script src="app.js"></script>
+  <script src="profile.js"></script>
 </body>
 </html>

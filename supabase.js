@@ -110,6 +110,118 @@
     button.title = window.currentUser?.email || "Sign in to manage listings";
   }
 
+  function requireProfileOwner(expectedUserId, action) {
+    if (!client) throw new Error("Supabase is not configured.");
+    const user = window.currentUser;
+    if (!user) throw new Error(`Please sign in to ${action}.`);
+    if (expectedUserId && user.id !== expectedUserId) {
+      throw new Error("Your account changed. Please reopen your profile and try again.");
+    }
+    return user;
+  }
+
+  function assertProfileOwnerStillCurrent(user) {
+    if (window.currentUser?.id !== user.id) {
+      throw new Error("Your account changed. Please reopen your profile and try again.");
+    }
+  }
+
+  const profileRepo = {
+    configured,
+    async get(expectedUserId) {
+      const user = requireProfileOwner(expectedUserId, "view your profile");
+      const { data, error } = await client.from("profiles").select("*").eq("id", user.id).maybeSingle();
+      if (error) throw error;
+      assertProfileOwnerStillCurrent(user);
+      return data || {
+        id: user.id,
+        full_name: user.user_metadata?.full_name || "",
+        phone: "", agency: "", location: "", bio: "", website: "", avatar_path: null,
+        default_city: "Nairobi", default_purpose: "rent",
+        preferences: { accent: "emerald", compactCards: false, reduceMotion: false, autoFillListingContact: true }
+      };
+    },
+    async save(profile, expectedUserId) {
+      const user = requireProfileOwner(expectedUserId, "save your profile");
+      const payload = {
+        id: user.id,
+        full_name: String(profile.full_name || "").trim().slice(0, 80),
+        phone: String(profile.phone || "").trim().slice(0, 32),
+        agency: String(profile.agency || "").trim().slice(0, 100),
+        location: String(profile.location || "").trim().slice(0, 100),
+        bio: String(profile.bio || "").trim().slice(0, 500),
+        website: String(profile.website || "").trim().slice(0, 200),
+        avatar_path: profile.avatar_path || null,
+        default_city: String(profile.default_city || "Nairobi").slice(0, 60),
+        default_purpose: profile.default_purpose === "sale" ? "sale" : "rent",
+        preferences: profile.preferences && typeof profile.preferences === "object" ? profile.preferences : {},
+        updated_at: new Date().toISOString()
+      };
+      const { data, error } = await client.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
+      if (error) throw error;
+      assertProfileOwnerStillCurrent(user);
+      return data;
+    },
+    async uploadAvatar(file, expectedUserId) {
+      const user = requireProfileOwner(expectedUserId, "upload an avatar");
+      const allowed = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
+      if (!allowed.has(file.type) || file.size > 2 * 1024 * 1024) {
+        throw new Error("Choose a JPG, PNG, WEBP, or AVIF image under 2 MB.");
+      }
+      const extension = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" })[file.type];
+      const path = `${user.id}/${crypto.randomUUID()}.${extension}`;
+      const bucket = client.storage.from("user-avatars");
+      const { data, error } = await bucket.upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+      if (error) throw error;
+      try {
+        assertProfileOwnerStillCurrent(user);
+        const { data: signed, error: signedError } = await bucket.createSignedUrl(data.path, 12 * 60 * 60);
+        if (signedError) throw signedError;
+        assertProfileOwnerStillCurrent(user);
+        return { path: data.path, url: signed.signedUrl };
+      } catch (error) {
+        await bucket.remove([data.path]);
+        throw error;
+      }
+    },
+    async avatarUrl(path, expectedUserId) {
+      if (!path) return "";
+      const user = requireProfileOwner(expectedUserId, "view your profile photo");
+      const { data, error } = await client.storage.from("user-avatars").createSignedUrl(path, 12 * 60 * 60);
+      if (error) throw error;
+      assertProfileOwnerStillCurrent(user);
+      return data.signedUrl;
+    },
+    async removeAvatar(path, expectedUserId) {
+      if (!path) return;
+      const user = requireProfileOwner(expectedUserId, "remove your profile photo");
+      const { error } = await client.storage.from("user-avatars").remove([path]);
+      if (error) throw error;
+      assertProfileOwnerStillCurrent(user);
+    },
+    async updateEmail(email, expectedUserId) {
+      const user = requireProfileOwner(expectedUserId, "change your email");
+      const { data, error } = await client.auth.updateUser({ email });
+      if (error) throw error;
+      assertProfileOwnerStillCurrent(user);
+      return data;
+    },
+    async updatePassword(password, expectedUserId) {
+      const user = requireProfileOwner(expectedUserId, "change your password");
+      const { data, error } = await client.auth.updateUser({ password });
+      if (error) throw error;
+      assertProfileOwnerStillCurrent(user);
+      return data;
+    },
+    async signOut() {
+      if (!client) return;
+      const { error } = await client.auth.signOut();
+      if (error) throw error;
+    }
+  };
+
+  window.profileRepo = profileRepo;
+
   const propertyRepo = {
     configured,
     async list() {

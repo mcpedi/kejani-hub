@@ -1125,6 +1125,21 @@ async function openAddModal() {
   currentPropertyImages = [];
   renderPropertyImagePreview();
   document.getElementById("new-status").value = "available";
+  const profile = window.currentProfile;
+  if (profile) {
+    const preferences = profile.preferences || {};
+    const citySelect = document.getElementById("new-city");
+    if (profile.default_city && Array.from(citySelect.options).some((option) => option.value === profile.default_city)) {
+      citySelect.value = profile.default_city;
+    }
+    if (["rent", "sale"].includes(profile.default_purpose)) {
+      document.getElementById("new-purpose").value = profile.default_purpose;
+    }
+    if (preferences.autoFillListingContact !== false) {
+      document.getElementById("new-agent").value = profile.agency || profile.full_name || "";
+      document.getElementById("new-phone").value = profile.phone || "";
+    }
+  }
   document.getElementById("add-modal").classList.remove("hidden");
 }
 
