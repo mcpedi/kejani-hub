@@ -2,6 +2,15 @@
 html {
   scroll-behavior: smooth;
 }
+body.auth-required > :not(#auth-gate):not(#supabase-auth-modal) {
+  display: none !important;
+}
+body.auth-required > #auth-gate {
+  display: flex !important;
+}
+body:not(.auth-required) > #auth-gate {
+  display: none !important;
+}
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {

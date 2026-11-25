@@ -1,5 +1,5 @@
 /* Supabase browser integration for NyumbaHub.
- * Public reads are enabled by RLS; listing mutations require a signed-in owner.
+ * Property reads require an authenticated session; listing mutations require an owner.
  */
 (function () {
   const config = window.SUPABASE_CONFIG || {};
@@ -11,9 +11,11 @@
 
   window.currentUser = null;
   window.supabaseReady = !!client;
+  window.authSessionResolved = !client;
 
   function announceAuthChange(user) {
     window.currentUser = user || null;
+    window.authSessionResolved = true;
     window.dispatchEvent(new CustomEvent("supabase-auth-change", { detail: { user: window.currentUser } }));
     updateAuthButton();
   }
@@ -53,10 +55,10 @@
     modal.innerHTML = `
       <section class="bg-white rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl">
         <div class="flex items-center justify-between mb-2">
-          <h2 class="text-xl font-extrabold text-slate-900">Landlord / agent sign in</h2>
+          <h2 class="text-xl font-extrabold text-slate-900">Sign in to NyumbaHub</h2>
           <button type="button" id="supabase-auth-close" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200">×</button>
         </div>
-        <p class="text-sm text-slate-500 mb-5">Sign in to publish and manage your own property listings.</p>
+        <p class="text-sm text-slate-500 mb-5">Sign in or create an account to browse listings and use the marketplace.</p>
         <form id="supabase-auth-form" class="space-y-3">
           <label class="block text-xs font-bold text-slate-600">Email
             <input id="supabase-email" type="email" required autocomplete="email" class="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm" />
@@ -355,7 +357,9 @@
 
   if (client) {
     createAuthUI();
-    client.auth.getSession().then(({ data }) => announceAuthChange(data.session?.user));
+    client.auth.getSession()
+      .then(({ data }) => announceAuthChange(data?.session?.user))
+      .catch(() => announceAuthChange(null));
     client.auth.onAuthStateChange((_event, session) => announceAuthChange(session?.user));
   } else {
     window.addEventListener("DOMContentLoaded", () => {

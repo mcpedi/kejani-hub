@@ -195,10 +195,10 @@ function loadSavedProperties() {
 }
 
 async function refreshPropertiesFromSupabase() {
-  if (!window.propertyRepo?.configured) return;
+  if (!window.propertyRepo?.configured || !window.currentUser) return;
   try {
     const remote = await window.propertyRepo.list();
-    if (remote) {
+    if (remote && window.currentUser) {
       const demo = defaultProperties.map((item) => ({ ...item, id: -Number(item.id) }));
       properties = [...demo, ...remote];
       renderProperties();
@@ -1369,10 +1369,20 @@ window.addEventListener("click", (e) => {
 // Initialize App
 updateFavBadge();
 updateCompareUI();
-renderProperties();
-refreshPropertiesFromSupabase();
-window.addEventListener("supabase-auth-change", () => {
+if (window.currentUser) {
+  renderProperties();
   refreshPropertiesFromSupabase();
+} else {
+  properties = [];
+  renderProperties();
+}
+window.addEventListener("supabase-auth-change", (event) => {
+  if (event.detail?.user) {
+    refreshPropertiesFromSupabase();
+  } else {
+    properties = [];
+    renderProperties();
+  }
   if (currentPortal === "dashboard") renderDashboard();
 });
 if (window.propertyRepo?.configured) {

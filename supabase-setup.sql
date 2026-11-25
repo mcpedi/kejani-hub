@@ -34,12 +34,13 @@ create index if not exists properties_user_id_idx on public.properties (user_id)
 alter table public.properties enable row level security;
 
 drop policy if exists "Public can read properties" on public.properties;
+drop policy if exists "Authenticated users can read properties" on public.properties;
 drop policy if exists "Authenticated users can insert properties" on public.properties;
 drop policy if exists "Owners can update their properties" on public.properties;
 drop policy if exists "Owners can delete their properties" on public.properties;
 
-create policy "Public can read properties"
-  on public.properties for select to anon, authenticated
+create policy "Authenticated users can read properties"
+  on public.properties for select to authenticated
   using (true);
 create policy "Authenticated users can insert properties"
   on public.properties for insert to authenticated
@@ -52,7 +53,8 @@ create policy "Owners can delete their properties"
   on public.properties for delete to authenticated
   using (auth.uid() = user_id);
 
-grant select on public.properties to anon, authenticated;
+revoke all privileges on table public.properties from anon;
+grant select on public.properties to authenticated;
 grant insert, update, delete on public.properties to authenticated;
 
 -- Supabase Storage for public listing photos (up to 5 MB each).
