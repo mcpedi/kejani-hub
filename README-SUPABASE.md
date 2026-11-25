@@ -8,6 +8,8 @@ The project already had `public.properties`, using UUID listing IDs and `user_id
 
 The included `supabase-setup.sql` now matches the existing UUID/`user_id` schema, preserves listing data, and configures authenticated-only listing reads, owner-scoped write policies, the public `property-images` bucket, and private `profiles`/`user-avatars` resources. Profile rows and avatar files are private to each signed-in user. The SQL is rerunnable for another compatible environment. Listing uploads allow five JPG, PNG, WEBP, or AVIF images per listing, 5 MB each; avatars allow one JPG, PNG, WEBP, or AVIF image up to 2 MB.
 
+The additive migration `migrations/20261125_require_authenticated_marketplace.sql` has been applied to this project. It replaces the anonymous property-read policy and removes all `anon` privileges on `public.properties` without altering listing rows or existing owner-scoped write policies. Verification confirmed the SELECT policy targets `authenticated` and that anonymous SELECT is denied while authenticated SELECT remains granted.
+
 ## Included behavior
 
 - The first screen requires Supabase sign-in or account creation; signed-out visitors cannot use the site's listings and tools. Authenticated users can read property records and create listings, and only listing owners can update or delete them.
@@ -17,7 +19,7 @@ The included `supabase-setup.sql` now matches the existing UUID/`user_id` schema
 - Signed-in users can manage a private profile and avatar, update account email/password, save listing defaults, choose an accent color, compact property cards, and reduce motion.
 - Saved listing defaults prefill new listings only; they never rewrite existing listing contacts or settings.
 - Signed-in users can save, apply, pause, resume, and delete private property-search alerts. New matching listing counts are calculated in-app from Supabase `created_at` values; there is no email, SMS, or push delivery.
-- Existing sample properties remain demo content and are not stored in Supabase; they are not exposed to signed-out visitors.
+- Existing sample properties remain demo content, are not stored in Supabase, and are hidden from signed-out visitors; the examples remain in the public JavaScript bundle and are not confidential listings.
 - If Supabase is unavailable or unconfigured, the site fails closed and displays a sign-in setup message instead of opening guest demo mode. Listing photo objects remain in the existing public storage bucket; this login gate controls the site and property records, not direct access to a known photo URL.
 
 The `property_alerts` table is an additive extension with owner-only row-level security. Its migration is in `migrations/20261124_property_alerts.sql`; the rerunnable `supabase-setup.sql` also includes it for compatible fresh setup. The alert feature uses the existing Supabase Auth session and browser-safe publishable key.
