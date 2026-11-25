@@ -14,7 +14,7 @@ The additive migration `migrations/20261125_require_authenticated_marketplace.sq
 
 - The first screen requires Supabase sign-in or account creation; signed-out visitors cannot use the site's listings and tools. Authenticated users can read property records and create listings, and only listing owners can update or delete them.
 - The landlord dashboard shows listings owned by the signed-in account.
-- Sign-in and account creation use Supabase Auth email and password.
+- Sign-in uses Supabase Auth email and password. Create account opens a separate registration form requiring full name, email, password, and a matching password confirmation; phone is optional. The details are validated before submission and saved as Supabase user metadata. If email confirmation is enabled, the user stays on the gate until confirming and signing in.
 - Add/edit forms support multiple property photos; uploaded images appear in listing cards and a selectable detail gallery.
 - Signed-in users can manage a private profile and avatar, update account email/password, save listing defaults, choose an accent color, compact property cards, and reduce motion.
 - Saved listing defaults prefill new listings only; they never rewrite existing listing contacts or settings.

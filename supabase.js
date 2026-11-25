@@ -53,23 +53,32 @@
     modal.id = "supabase-auth-modal";
     modal.className = "fixed inset-0 z-[60] hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4";
     modal.innerHTML = `
-      <section class="bg-white rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl">
+      <section class="bg-white rounded-2xl max-h-[90vh] max-w-md w-full overflow-y-auto p-6 sm:p-8 shadow-2xl">
         <div class="flex items-center justify-between mb-2">
-          <h2 class="text-xl font-extrabold text-slate-900">Sign in to NyumbaHub</h2>
+          <h2 id="supabase-auth-title" class="text-xl font-extrabold text-slate-900">Sign in to NyumbaHub</h2>
           <button type="button" id="supabase-auth-close" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200">×</button>
         </div>
-        <p class="text-sm text-slate-500 mb-5">Sign in or create an account to browse listings and use the marketplace.</p>
+        <p id="supabase-auth-description" class="text-sm text-slate-500 mb-5">Sign in to browse listings and use the marketplace.</p>
         <form id="supabase-auth-form" class="space-y-3">
+          <label id="supabase-name-wrap" class="hidden block text-xs font-bold text-slate-600">Full name
+            <input id="supabase-name" type="text" maxlength="80" autocomplete="name" class="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm" />
+          </label>
+          <label id="supabase-phone-wrap" class="hidden block text-xs font-bold text-slate-600">Phone number (optional)
+            <input id="supabase-phone" type="tel" maxlength="32" autocomplete="tel" class="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm" />
+          </label>
           <label class="block text-xs font-bold text-slate-600">Email
             <input id="supabase-email" type="email" required autocomplete="email" class="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm" />
           </label>
           <label class="block text-xs font-bold text-slate-600">Password
             <input id="supabase-password" type="password" required minlength="6" autocomplete="current-password" class="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm" />
           </label>
-          <p id="supabase-auth-error" class="hidden text-sm text-rose-600" role="alert"></p>
-          <div class="flex gap-3 pt-2">
-            <button type="submit" class="flex-1 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold">Sign in</button>
-            <button type="button" id="supabase-signup" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-bold">Create account</button>
+          <label id="supabase-confirm-wrap" class="hidden block text-xs font-bold text-slate-600">Confirm password
+            <input id="supabase-password-confirm" type="password" minlength="6" autocomplete="new-password" class="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm" />
+          </label>
+          <p id="supabase-auth-feedback" class="hidden text-sm" role="status" aria-live="polite"></p>
+          <div class="space-y-3 pt-2">
+            <button id="supabase-auth-submit" type="submit" class="w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700">Sign in</button>
+            <button id="supabase-auth-mode-toggle" type="button" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold hover:bg-slate-50">Create account</button>
           </div>
         </form>
       </section>`;
@@ -77,32 +86,91 @@
     document.getElementById("supabase-auth-close").addEventListener("click", () => modal.classList.add("hidden"));
     modal.addEventListener("click", (event) => { if (event.target === modal) modal.classList.add("hidden"); });
 
-    const submitAuth = async (mode) => {
-      const email = document.getElementById("supabase-email").value.trim();
-      const password = document.getElementById("supabase-password").value;
-      const errorBox = document.getElementById("supabase-auth-error");
-      errorBox.classList.add("hidden");
-      const result = mode === "signup"
-        ? await client.auth.signUp({ email, password })
-        : await client.auth.signInWithPassword({ email, password });
-      if (result.error) {
-        errorBox.textContent = result.error.message;
-        errorBox.classList.remove("hidden");
-        return;
-      }
-      if (mode === "signup" && !result.data.session) {
-        errorBox.textContent = "Account created. Check your email to confirm it, then sign in.";
-        errorBox.classList.remove("hidden");
-        return;
-      }
-      modal.classList.add("hidden");
-      toast(mode === "signup" ? "Account created and signed in." : "Signed in successfully.", "success");
-    };
-    document.getElementById("supabase-auth-form").addEventListener("submit", (event) => {
+    const form = document.getElementById("supabase-auth-form");
+    const emailInput = document.getElementById("supabase-email");
+    const passwordInput = document.getElementById("supabase-password");
+    const nameInput = document.getElementById("supabase-name");
+    const phoneInput = document.getElementById("supabase-phone");
+    const confirmInput = document.getElementById("supabase-password-confirm");
+    const feedback = document.getElementById("supabase-auth-feedback");
+    const submitButton = document.getElementById("supabase-auth-submit");
+    const modeToggle = document.getElementById("supabase-auth-mode-toggle");
+    let authMode = "signin";
+
+    function setAuthMode(mode) {
+      authMode = mode;
+      const creatingAccount = mode === "signup";
+      document.getElementById("supabase-auth-title").textContent = creatingAccount ? "Create your NyumbaHub account" : "Sign in to NyumbaHub";
+      document.getElementById("supabase-auth-description").textContent = creatingAccount
+        ? "Enter your details below. You must create an account and sign in before accessing the site."
+        : "Sign in to browse listings and use the marketplace.";
+      document.getElementById("supabase-name-wrap").classList.toggle("hidden", !creatingAccount);
+      document.getElementById("supabase-phone-wrap").classList.toggle("hidden", !creatingAccount);
+      document.getElementById("supabase-confirm-wrap").classList.toggle("hidden", !creatingAccount);
+      nameInput.required = creatingAccount;
+      confirmInput.required = creatingAccount;
+      passwordInput.autocomplete = creatingAccount ? "new-password" : "current-password";
+      submitButton.textContent = creatingAccount ? "Create account" : "Sign in";
+      modeToggle.textContent = creatingAccount ? "I already have an account — sign in" : "Create account";
+      feedback.classList.add("hidden");
+      feedback.textContent = "";
+    }
+
+    function showFeedback(message, type = "error") {
+      feedback.textContent = message;
+      feedback.className = `text-sm ${type === "error" ? "text-rose-600" : "text-emerald-700"}`;
+    }
+
+    setAuthMode("signin");
+    modeToggle.addEventListener("click", () => setAuthMode(authMode === "signin" ? "signup" : "signin"));
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      submitAuth("signin");
+      if (!form.reportValidity()) return;
+      const mode = authMode;
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      const fullName = nameInput.value.trim();
+      if (mode === "signup" && !fullName) {
+        showFeedback("Enter your full name to create an account.");
+        nameInput.focus();
+        return;
+      }
+      if (mode === "signup" && password !== confirmInput.value) {
+        showFeedback("The passwords do not match.");
+        confirmInput.focus();
+        return;
+      }
+
+      feedback.classList.add("hidden");
+      submitButton.disabled = true;
+      submitButton.textContent = mode === "signup" ? "Creating account…" : "Signing in…";
+      try {
+        const result = mode === "signup"
+          ? await client.auth.signUp({
+            email,
+            password,
+            options: { data: { full_name: fullName, phone: phoneInput.value.trim() } }
+          })
+          : await client.auth.signInWithPassword({ email, password });
+        if (result.error) {
+          showFeedback(result.error.message);
+          return;
+        }
+        if (mode === "signup" && !result.data.session) {
+          setAuthMode("signin");
+          emailInput.value = email;
+          showFeedback("Your details were submitted. Check your email to confirm the account, then sign in.", "success");
+          return;
+        }
+        modal.classList.add("hidden");
+        toast(mode === "signup" ? "Account created and signed in." : "Signed in successfully.", "success");
+      } catch (error) {
+        showFeedback(error.message || "Could not complete authentication. Please try again.");
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = authMode === "signup" ? "Create account" : "Sign in";
+      }
     });
-    document.getElementById("supabase-signup").addEventListener("click", () => submitAuth("signup"));
   }
 
   function updateAuthButton() {
@@ -138,7 +206,7 @@
       return data || {
         id: user.id,
         full_name: user.user_metadata?.full_name || "",
-        phone: "", agency: "", location: "", bio: "", website: "", avatar_path: null,
+        phone: user.user_metadata?.phone || "", agency: "", location: "", bio: "", website: "", avatar_path: null,
         default_city: "Nairobi", default_purpose: "rent",
         preferences: { accent: "emerald", compactCards: false, reduceMotion: false, autoFillListingContact: true }
       };
